@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { memo, useState } from 'react';
+import { useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
 import type { ArtItem } from '../spotify/types';
 
@@ -13,6 +14,10 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const { rotateX, rotateY, glare, handlers, reset } = useTilt(9);
+
+  const collected = useInCollection(item.record?.id);
+  // Inside the Collection view every tile is collected, so the mark would just be noise there.
+  const showMark = collected && !item.key.startsWith('record-');
 
   const stackDepth = Math.min((item.tracks?.length ?? 1) - 1, 2);
   // Albums with several of your top tracks get a bigger slot on the wall.
@@ -66,6 +71,7 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect }: Props) {
 
         {item.rank && <span className="tile-rank">{item.rank}</span>}
         {item.tracks && item.tracks.length > 1 && <span className="tile-count">{item.tracks.length} tracks</span>}
+        {showMark && <span className="tile-collected" title="In your collection" aria-label="In your collection" />}
 
         <span className="tile-caption">
           <span className="tile-title">{item.title}</span>

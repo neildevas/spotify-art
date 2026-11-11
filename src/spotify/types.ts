@@ -23,9 +23,30 @@ export type Track = {
   external_urls: { spotify: string };
 };
 
+/** Track as it appears inside a full album object (no album/images of its own). */
+export type AlbumTrack = {
+  id: string;
+  name: string;
+  duration_ms: number;
+  track_number: number;
+  explicit: boolean;
+  external_urls: { spotify: string };
+};
+
 export type Paging<T> = { items: T[]; next: string | null; total: number; limit: number; offset: number };
 
 export type SavedAlbum = { added_at: string; album: Album };
+
+export type Artist = {
+  id: string;
+  name: string;
+  images: SpotifyImage[];
+  genres?: string[];
+  external_urls: { spotify: string };
+};
+
+/** Which releases to show on an artist page. */
+export type AlbumGroup = 'album' | 'single' | 'all';
 
 export type User = { id: string; display_name: string | null; images: SpotifyImage[] };
 
@@ -43,5 +64,31 @@ export type ArtItem = {
   url: string;
   rank?: number;
   /** Present on grouped top-track albums: the user's top tracks from this album, best rank first. */
-  tracks?: { rank: number; title: string; duration: string; url: string }[];
+  tracks?: TrackEntry[];
+  /** Album to fetch a full tracklist for in the detail view (when `tracks` isn't set). */
+  albumId?: string;
+  /** Song to highlight in that tracklist. */
+  highlightTrackId?: string;
+  /** Linkable artists, so the detail view can jump to an artist page. */
+  artists?: { id: string; name: string }[];
+  /** The record (album / single / EP) this tile belongs to, so it can be added to the collection. */
+  record?: RecordInfo;
 };
+
+/** Everything needed to show a record without asking Spotify again. */
+export type RecordInfo = {
+  id: string; // Spotify album id
+  name: string;
+  artists: { id: string; name: string }[];
+  year: string;
+  type: Album['album_type'];
+  totalTracks: number;
+  image: string;
+  thumb: string;
+  url: string;
+};
+
+/** A record in the user's own (local) collection. */
+export type CollectedRecord = RecordInfo & { addedAt: number };
+
+export type TrackEntry = { rank: number; title: string; duration: string; url: string; id?: string };

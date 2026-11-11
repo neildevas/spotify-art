@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { isValidElement, useEffect, useRef } from 'react';
+import { useAlbumTracks } from '../hooks/useAlbumTracks';
+import { CollectButton } from './CollectButton';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
 import type { ArtItem } from '../spotify/types';
@@ -8,11 +10,22 @@ type Props = {
   item: ArtItem;
   onClose: () => void;
   onStep: (dir: -1 | 1) => void;
+  /** Jump to an artist's page; artist names become links when this is set. */
+  onArtist?: (artist: { id: string; name: string }) => void;
 };
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-export function DetailOverlay({ item, onClose, onStep }: Props) {
+export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
+  // Grouped top tracks bring their own list; everything else fetches the album's tracklist.
+  const fetched = useAlbumTracks(item.tracks ? undefined : item.albumId);
+  const tracklist = item.tracks ?? fetched;
+  const listRef = useRef<HTMLOListElement>(null);
+
+  useEffect(() => {
+    listRef.current?.querySelector('.is-current')?.scrollIntoView({ block: 'nearest' });
+  }, [tracklist]);
+
   const color = useDominantColor(item.thumb);
   // Same hover tilt + glare as the grid tiles, a little gentler at this size.
   const tilt = useTilt(6);
@@ -88,17 +101,28 @@ export function DetailOverlay({ item, onClose, onStep }: Props) {
               </p>
             ) : null,
             <h2 key="t">{item.title}</h2>,
-            <p className="overlay-artist" key="a">{item.subtitle}</p>,
+            <p className="overlay-artist" key="a">
+              {onArtist && item.artists?.length
+                ? item.artists.map((a, i) => (
+                    <span key={a.id}>
+                      {i > 0 && ', '}
+                      <button className="artist-link" onClick={() => onArtist(a)}>
+                        {a.name}
+                      </button>
+                    </span>
+                  ))
+                : item.subtitle}
+            </p>,
             <ul className="overlay-meta" key="m">
               {item.year && <li>{item.year}</li>}
               {item.details.map((d) => (
                 <li key={d}>{d}</li>
               ))}
             </ul>,
-            item.tracks ? (
-              <ol className="tracklist" key="tl">
-                {item.tracks.map((t) => (
-                  <li key={t.rank}>
+            tracklist?.length ? (
+              <ol className="tracklist" key="tl" ref={listRef}>
+                {tracklist.map((t) => (
+                  <li key={t.id ?? t.rank} className={t.id && t.id === item.highlightTrackId ? 'is-current' : ''}>
                     <span className="tl-rank">{t.rank}</span>
                     <a href={t.url} target="_blank" rel="noreferrer" className="tl-title">
                       {t.title}
@@ -108,14 +132,17 @@ export function DetailOverlay({ item, onClose, onStep }: Props) {
                 ))}
               </ol>
             ) : null,
-            <a key="l" className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
-              Open in Spotify ↗
-            </a>,
+            <div className="overlay-actions" key="l">
+              {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
+              <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
+                Open in Spotify ↗
+              </a>
+            </div>,
           ]
             .filter(Boolean)
             .map((child, i) => (
               <motion.div
-                key={i}
+                key={isValidElement(child) && child.key != null ? child.key : i}
                 variants={{
                   hidden: { opacity: 0, y: 14, filter: 'blur(6px)' },
                   show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.5, ease } },
