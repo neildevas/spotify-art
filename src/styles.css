@@ -418,10 +418,14 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 }
 .btn-collect.is-in { background: rgba(255,255,255,0.08); color: var(--fg); border-color: rgba(255,255,255,0.25); }
 .btn-collect-label { display: inline-block; white-space: nowrap; }
-.btn-collect .when-hover { display: none; }
+/* Both labels share one grid cell, so the button keeps the width of the longer one.
+   (Swapping widths on hover made the edge slide out from under the cursor → hover flicker.) */
+.btn-collect.is-in .btn-collect-label { display: inline-grid; justify-items: center; }
+.btn-collect .when-idle, .btn-collect .when-hover { grid-area: 1 / 1; }
+.btn-collect .when-hover { visibility: hidden; }
 .btn-collect.is-in:not(.fresh):hover { border-color: #ff8a80; color: #ff8a80; }
-.btn-collect.is-in:not(.fresh):hover .when-idle { display: none; }
-.btn-collect.is-in:not(.fresh):hover .when-hover { display: inline; }
+.btn-collect.is-in:not(.fresh):hover .when-idle { visibility: hidden; }
+.btn-collect.is-in:not(.fresh):hover .when-hover { visibility: visible; }
 
 /* A tiny record in the corner = this one's in your collection */
 .tile-collected {
@@ -442,4 +446,79 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 @media (max-width: 760px) {
   .header .segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .header .segmented::-webkit-scrollbar { display: none; }
+}
+
+/* ---------- Single (one record at a time) ---------- */
+.single {
+  --card: min(calc(100vh - 420px), 640px, 78vw); /* leaves room for header, toolbar, title and nav */
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 8px; user-select: none;
+}
+.single > :not(.single-ambient) { position: relative; z-index: 1; }
+.single-ambient {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 55% at 50% 45%, color-mix(in srgb, var(--ambient) 38%, transparent), transparent 75%);
+  transition: background 0.9s var(--ease);
+}
+.single-stage {
+  position: relative; width: 100%;
+  height: calc(var(--card) + 24px);
+  perspective: 1600px;
+}
+.single-card {
+  position: absolute; top: 12px; left: calc(50% - var(--card) / 2);
+  width: var(--card); aspect-ratio: 1; cursor: grab; touch-action: pan-y;
+}
+.single-card:active { cursor: grabbing; }
+.single-tilt-wrap { width: 100%; height: 100%; perspective: 1400px; }
+.single-tilt { width: 100%; height: 100%; transform-style: preserve-3d; }
+.single-art {
+  position: relative; display: block; width: 100%; height: 100%;
+  border-radius: 8px; overflow: hidden; cursor: inherit;
+  box-shadow: 0 50px 110px -30px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06);
+}
+.single-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.single-art:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+.single-tilt-wrap:hover .single-glare { opacity: 1; }
+
+.single-peek {
+  position: absolute; top: 50%;
+  width: calc(var(--card) * 0.55); aspect-ratio: 1;
+  border-radius: 6px; overflow: hidden;
+  filter: brightness(0.45) saturate(0.7);
+  box-shadow: 0 30px 60px -20px rgba(0,0,0,0.8);
+  transition: filter 0.3s var(--ease);
+}
+.single-peek img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.single-peek:hover { filter: brightness(0.7) saturate(0.9); }
+/* Tucked mostly behind the main cover, half in view */
+.single-peek-left { left: calc(50% - var(--card) / 2 - var(--card) * 0.3); transform: translate(-50%, -50%) perspective(900px) rotateY(28deg); }
+.single-peek-right { left: calc(50% + var(--card) / 2 + var(--card) * 0.3); transform: translate(-50%, -50%) perspective(900px) rotateY(-28deg); }
+
+.single-info { text-align: center; margin-top: 20px; min-height: 92px; max-width: min(720px, 90vw); }
+.single-info h2 {
+  font-family: var(--serif); font-weight: 400; margin: 0 0 6px;
+  font-size: clamp(28px, 3.4vw, 44px); line-height: 1.05; text-wrap: balance;
+}
+.single-info p { margin: 0; color: rgba(255,255,255,0.8); }
+.single-info .eyebrow { margin-bottom: 8px; }
+.single-year { color: var(--fg-dim); }
+
+.single-nav { display: flex; align-items: center; gap: 18px; margin-top: 8px; }
+.nav-btn {
+  width: 44px; height: 44px; border-radius: 50%; font-size: 18px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+  transition: background 0.2s, transform 0.25s var(--ease), opacity 0.2s;
+}
+.nav-btn:hover:not(:disabled) { background: rgba(255,255,255,0.14); transform: scale(1.06); }
+.nav-btn:disabled { opacity: 0.3; cursor: default; }
+.single-count { font-size: 13px; color: var(--fg-dim); font-variant-numeric: tabular-nums; min-width: 72px; text-align: center; }
+.single-skeleton { width: var(--card); aspect-ratio: 1; border-radius: 8px; }
+
+.layout-toggle .segmented-label { font-size: 15px; line-height: 1; }
+
+@media (max-width: 760px) {
+  .single { --card: min(calc(100vh - 440px), 86vw); }
+  .single-peek { display: none; }
 }

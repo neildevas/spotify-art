@@ -3,7 +3,7 @@ import {
   AuthError,
   albumToItem,
   artistAlbumToItem,
-  artistAlbums,
+  artistAlbumsPage,
   peekSearch,
   savedAlbums,
   savedAlbumsHead,
@@ -210,46 +210,52 @@ export function useSearch(query: string, filter: SearchFilter, onAuthError: () =
   return { ...state, loadMore };
 }
 
-const IDLE = { items: [] as ArtItem[], loading: false, error: null as Error | null };
+type ArtistAlbumsState = { items: ArtItem[]; loading: boolean; error: Error | null; next: string | null };
+const IDLE: ArtistAlbumsState = { items: [], loading: false, error: null, next: null };
 
-/** Streams an artist's releases in, dropping duplicate editions (same name + type). */
+/**
+ * An artist's releases, one page at a time (first page on open, more on request),
+ * dropping duplicate editions (same name + type).
+ */
 export function useArtistAlbums(artistId: string | null, group: AlbumGroup, onAuthError: () => void) {
-  const [state, setState] = useState(IDLE);
+  const [state, setState] = useState<ArtistAlbumsState>(IDLE);
+  const seen = useRef(new Set<string>());
+  const requestId = useRef(0);
 
-  useEffect(() => {
-    if (!artistId) {
-      setState(IDLE);
-      return;
-    }
-    let alive = true;
-    const seen = new Set<string>();
-    setState({ items: [], loading: true, error: null });
-
-    (async () => {
+  const load = useCallback(
+    async (next: string | null) => {
+      if (!artistId) return;
+      const id = ++requestId.current;
+      setState((s) => ({ ...s, loading: true, error: null }));
       try {
-        for await (const page of artistAlbums(artistId, group)) {
-          if (!alive) return;
-          const fresh = page
-            .filter((a) => {
-              const k = `${a.album_type}:${a.name.toLowerCase()}`;
-              if (seen.has(k)) return false;
-              seen.add(k);
-              return true;
-            })
-            .map(artistAlbumToItem);
-          setState((s) => ({ ...s, items: [...s.items, ...fresh] }));
-        }
-        if (alive) setState((s) => ({ ...s, loading: false }));
+        const page = await artistAlbumsPage(artistId, group, next);
+        if (id !== requestId.current) return;
+        const fresh = page.items
+          .filter((a) => {
+            const k = `${a.album_type}:${a.name.toLowerCase()}`;
+            if (seen.current.has(k)) return false;
+            seen.current.add(k);
+            return true;
+          })
+          .map(artistAlbumToItem);
+        setState((s) => ({ items: next ? [...s.items, ...fresh] : fresh, loading: false, error: null, next: page.next }));
       } catch (e) {
         if (e instanceof AuthError) return onAuthError();
-        if (alive) setState((s) => ({ ...s, loading: false, error: e as Error }));
+        if (id === requestId.current) setState((s) => ({ ...s, loading: false, error: e as Error }));
       }
-    })();
+    },
+    [artistId, group, onAuthError],
+  );
 
-    return () => {
-      alive = false;
-    };
-  }, [artistId, group, onAuthError]);
+  useEffect(() => {
+    seen.current = new Set();
+    setState(artistId ? { ...IDLE, loading: true } : IDLE);
+    load(null);
+  }, [artistId, load]);
 
-  return state;
+  const loadMore = useCallback(() => {
+    if (state.next && !state.loading) load(state.next);
+  }, [state.next, state.loading, load]);
+
+  return { ...state, hasMore: !!state.next, loadMore };
 }

@@ -20,28 +20,80 @@ const BASE = 'https://api.spotify.com/v1';
 
 export class AuthError extends Error {}
 
+/**
+ * Spotify rate-limits groups of endpoints separately (the groups aren't published), so we back off
+ * per area instead of globally: a limit on artist pages shouldn't block search, and vice versa.
+ */
+type Bucket = 'search' | 'artists' | 'albums' | 'top' | 'library' | 'profile' | 'other';
+
+const BUCKET_LABEL: Record<Bucket, string> = {
+  search: 'search',
+  artists: 'artist pages',
+  albums: 'album tracklists',
+  top: 'top tracks',
+  library: 'your saved albums',
+  profile: 'your profile',
+  other: 'this request',
+};
+
+function bucketFor(path: string): Bucket {
+  const p = path.replace(BASE, '');
+  if (p.startsWith('/search')) return 'search';
+  if (p.startsWith('/artists')) return 'artists';
+  if (p.startsWith('/albums')) return 'albums';
+  if (p.startsWith('/me/top')) return 'top';
+  if (p.startsWith('/me/albums')) return 'library';
+  if (p === '/me' || p.startsWith('/me?')) return 'profile';
+  return 'other';
+}
+
+function describeWait(sec: number, estimated: boolean) {
+  if (estimated) return sec < 120 ? 'in a minute or so' : `in about ${Math.round(sec / 60)} min`;
+  if (sec < 90) return `in ${Math.ceil(sec)}s`;
+  const mins = Math.ceil(sec / 60);
+  return `in about ${mins < 90 ? `${mins} min` : `${Math.round(mins / 60)} h`}`;
+}
+
 /** Spotify asked us to back off for longer than is worth waiting in the background. */
 export class RateLimitError extends Error {
-  constructor(public retryAfterSec: number) {
-    const mins = Math.ceil(retryAfterSec / 60);
+  constructor(
+    public retryAfterSec: number,
+    public area: string,
+    public quota = false,
+    estimated = false,
+  ) {
     super(
-      retryAfterSec < 90
-        ? `Spotify is rate limiting requests — try again in ${Math.ceil(retryAfterSec)}s.`
-        : `Spotify is rate limiting requests — try again in about ${mins < 90 ? `${mins} min` : `${Math.round(mins / 60)} h`}.`,
+      quota
+        ? `You've used up Spotify's request quota for ${area} — try again ${describeWait(retryAfterSec, estimated)}.`
+        : `Spotify is rate limiting ${area} — try again ${describeWait(retryAfterSec, estimated)}.`,
     );
   }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// One shared back-off window: after a 429, *every* request waits, instead of each one hammering
-// Spotify and collecting its own 429.
-let pausedUntil = 0;
+const pausedUntil = new Map<Bucket, { until: number; quota: boolean; estimated: boolean }>();
 const SHORT_WAIT_SEC = 20;
+// Browsers often can't read Spotify's Retry-After header (it isn't exposed via CORS), so when it's
+// missing we guess on the cautious side rather than retrying almost immediately.
+const FALLBACK_RATE_SEC = 60;
+const FALLBACK_QUOTA_SEC = 15 * 60;
+
+async function readReason(res: Response): Promise<string | undefined> {
+  try {
+    const body = await res.json();
+    return body?.reason ?? body?.error?.reason;
+  } catch {
+    return undefined;
+  }
+}
 
 async function spotify<T>(path: string, attempt = 0): Promise<T> {
-  const waitMs = pausedUntil - Date.now();
-  if (waitMs > SHORT_WAIT_SEC * 1000) throw new RateLimitError(waitMs / 1000);
+  const bucket = bucketFor(path);
+  const pause = pausedUntil.get(bucket);
+  const waitMs = pause ? pause.until - Date.now() : 0;
+  if (pause && waitMs > SHORT_WAIT_SEC * 1000)
+    throw new RateLimitError(waitMs / 1000, BUCKET_LABEL[bucket], pause.quota, pause.estimated);
   if (waitMs > 0) await sleep(waitMs);
 
   const token = await getAccessToken();
@@ -56,13 +108,22 @@ async function spotify<T>(path: string, attempt = 0): Promise<T> {
     throw new AuthError('Session expired');
   }
   if (res.status === 429) {
-    const retryAfter = Number(res.headers.get('Retry-After')) || 5;
-    pausedUntil = Math.max(pausedUntil, Date.now() + retryAfter * 1000);
-    if (retryAfter <= SHORT_WAIT_SEC && attempt < 2) {
+    const header = Number(res.headers.get('Retry-After'));
+    const quota = (await readReason(res)) === 'QUOTA_EXCEEDED';
+    const estimated = !header;
+    const retryAfter = header || (quota ? FALLBACK_QUOTA_SEC : FALLBACK_RATE_SEC);
+    const prev = pausedUntil.get(bucket);
+    pausedUntil.set(bucket, {
+      until: Math.max(prev?.until ?? 0, Date.now() + retryAfter * 1000),
+      quota,
+      estimated,
+    });
+    // Only retry quietly when Spotify told us exactly how long, and it's short.
+    if (!quota && !estimated && retryAfter <= SHORT_WAIT_SEC && attempt < 2) {
       await sleep(retryAfter * 1000);
       return spotify<T>(path, attempt + 1);
     }
-    throw new RateLimitError(retryAfter);
+    throw new RateLimitError(retryAfter, BUCKET_LABEL[bucket], quota, estimated);
   }
   if (!res.ok) throw new Error(`Spotify ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
@@ -125,24 +186,21 @@ const GROUPS: Record<AlbumGroup, string> = { album: 'album', single: 'single', a
 // pay for a failed request on every artist page.
 let artistPageSize: 50 | 10 = 50;
 
-/** Yields an artist's releases page by page. Pages are cached for an hour. */
-export async function* artistAlbums(artistId: string, group: AlbumGroup): AsyncGenerator<Album[]> {
+/**
+ * One page of an artist's releases. Pass the previous page's `next` URL to continue.
+ * Pages are cached for an hour.
+ */
+export async function artistAlbumsPage(artistId: string, group: AlbumGroup, next?: string | null) {
+  if (next) return get<Paging<Album>>(next, HOUR);
   const base = `/artists/${artistId}/albums?include_groups=${GROUPS[group]}`;
-  let first: Paging<Album>;
   try {
-    first = await get<Paging<Album>>(`${base}&limit=${artistPageSize}`, HOUR);
+    return await get<Paging<Album>>(`${base}&limit=${artistPageSize}`, HOUR);
   } catch (e) {
-    if (artistPageSize === 50 && e instanceof Error && e.message.includes('400')) {
+    if (artistPageSize === 50 && e instanceof Error && e.message.includes('Spotify 400')) {
       artistPageSize = 10;
-      first = await get<Paging<Album>>(`${base}&limit=10`, HOUR);
-    } else throw e;
-  }
-  yield first.items;
-  let next = first.next;
-  while (next) {
-    const page: Paging<Album> = await get<Paging<Album>>(next, HOUR);
-    yield page.items;
-    next = page.next;
+      return get<Paging<Album>>(`${base}&limit=10`, HOUR);
+    }
+    throw e;
   }
 }
 

@@ -33,7 +33,7 @@ type Props = {
   onArtist: (a: Artist | null) => void;
   group: AlbumGroup;
   onGroup: (g: AlbumGroup) => void;
-  albums: { items: ArtItem[]; loading: boolean; error: Error | null };
+  albums: { items: ArtItem[]; loading: boolean; error: Error | null; hasMore: boolean; loadMore: () => void };
   tileSize: number;
   onSelect: (item: ArtItem) => void;
 };
@@ -136,6 +136,7 @@ function SearchResults({
             tileSize={tileSize}
             onSelect={onSelect}
             skeletons={filter === 'all' ? 6 : 12}
+            allowSingle={filter !== 'all'}
           />
         </Section>
       )}
@@ -149,6 +150,7 @@ function SearchResults({
             onSelect={onSelect}
             captions
             skeletons={filter === 'all' ? 6 : 12}
+            allowSingle={filter !== 'all'}
           />
         </Section>
       )}
@@ -275,7 +277,7 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
             {artist.name}
             <span className="count">
               {albums.items.length}
-              {albums.loading && albums.items.length ? '…' : ''} releases
+              {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
             </span>
           </h1>
           {!!artist.genres?.length && (
@@ -296,6 +298,10 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
       <motion.div key={`${artist.id}-${group}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <ArtGrid items={albums.items} loading={albums.loading} tileSize={tileSize} onSelect={onSelect} />
       </motion.div>
+
+      {albums.hasMore && (
+        <LoadMore key={`more-${artist.id}-${group}`} onVisible={albums.loadMore} loading={albums.loading} />
+      )}
 
       {!albums.loading && !albums.error && albums.items.length === 0 && (
         <p className="empty">Nothing in this category.</p>

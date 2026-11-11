@@ -8,9 +8,11 @@ type Props = {
   item: ArtItem;
   index: number;
   onSelect: (item: ArtItem) => void;
+  /** Approximate rendered width in CSS px, used to choose between the 300px and 640px covers. */
+  tileWidth: number;
 };
 
-export const ArtTile = memo(function ArtTile({ item, index, onSelect }: Props) {
+export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth }: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const { rotateX, rotateY, glare, handlers, reset } = useTilt(9);
@@ -59,6 +61,8 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect }: Props) {
         >
           <img
             src={item.thumb}
+            srcSet={item.thumb !== item.image ? `${item.thumb} 300w, ${item.image} 640w` : undefined}
+            sizes={`(max-width: 760px) 50vw, ${featured ? tileWidth * 2 : tileWidth}px`}
             alt=""
             loading="lazy"
             decoding="async"

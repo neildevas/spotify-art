@@ -4,6 +4,7 @@ import { ArtGrid } from './components/ArtGrid';
 import { type CollectionSort, CollectionView } from './components/CollectionView';
 import { DetailOverlay } from './components/DetailOverlay';
 import { Header, Segmented, type View } from './components/Header';
+import { type LayoutMode, LayoutModeContext } from './components/LayoutMode';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
 import {
@@ -99,6 +100,7 @@ export default function App() {
 function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [view, setView] = usePersisted<View>('sleeve.view', 'albums');
   const [tileSize, setTileSize] = usePersisted('sleeve.tile', 180);
+  const [layout, setLayout] = usePersisted<LayoutMode>('sleeve.layout', 'grid');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
   const [sort, setSort] = usePersisted<Sort>('sleeve.sort', 'recent');
   const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
@@ -172,106 +174,111 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     [items],
   );
   const close = useCallback(() => setSelected(null), []);
+  const layoutState = useMemo(() => ({ mode: layout, selectedKey: selected?.key ?? null }), [layout, selected]);
 
   return (
-    <LayoutGroup>
-      <Header
-        view={view}
-        onView={(v) => {
-          setSelected(null);
-          setView(v);
-        }}
-        tileSize={tileSize}
-        onTileSize={setTileSize}
-        user={user}
-        onLogout={onSignOut}
-      />
+    <LayoutModeContext.Provider value={layoutState}>
+      <LayoutGroup>
+        <Header
+          view={view}
+          onView={(v) => {
+            setSelected(null);
+            setView(v);
+          }}
+          tileSize={tileSize}
+          onTileSize={setTileSize}
+          layout={layout}
+          onLayout={setLayout}
+          user={user}
+          onLogout={onSignOut}
+        />
 
-      <main className="main">
-        {view === 'collection' ? (
-          <CollectionView
-            items={collectionItems}
-            sort={collectionSort}
-            onSort={setCollectionSort}
-            tileSize={tileSize}
-            onSelect={setSelected}
-            onBrowse={() => setView('search')}
-          />
-        ) : view === 'search' ? (
-          <SearchView
-            query={query}
-            onQuery={setQuery}
-            filter={searchFilter}
-            onFilter={setSearchFilter}
-            results={search}
-            albumItems={searchAlbumItems}
-            songItems={searchSongItems}
-            artist={artist}
-            onArtist={openArtist}
-            group={artistGroup}
-            onGroup={setArtistGroup}
-            albums={artistAlbums}
-            tileSize={tileSize}
-            onSelect={setSelected}
-          />
-        ) : (
-          <>
-            <div className="toolbar">
-              <motion.h1 key={view} className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
-                {view === 'albums' ? 'Saved on Spotify' : 'On repeat'}
-                <span className="count">
-                  {view === 'albums'
-                    ? `${albums.items.length}${(albums.loading || albums.refreshing) && albums.items.length ? '…' : ''} albums`
-                    : trackMode === 'grouped'
-                      ? `${trackItems.length} albums · ${tracks.tracks.length} tracks`
-                      : `${tracks.tracks.length} tracks`}
-                </span>
-              </motion.h1>
-              {view === 'albums' ? (
-                <div className="toolbar-controls">
-                  <button
-                    className="text-btn"
-                    onClick={albums.refresh}
-                    disabled={albums.loading || albums.refreshing}
-                    title="Re-sync your saved albums from Spotify"
-                  >
-                    {albums.refreshing ? 'Syncing…' : 'Refresh'}
-                  </button>
-                  <Segmented small groupId="sort" value={sort} options={SORTS} onChange={setSort} />
-                </div>
-              ) : (
-                <div className="toolbar-controls">
-                  <Segmented small groupId="trackMode" value={trackMode} options={TRACK_MODES} onChange={setTrackMode} />
-                  <Segmented small groupId="range" value={range} options={RANGES} onChange={setRange} />
-                </div>
+        <main className="main">
+          {view === 'collection' ? (
+            <CollectionView
+              items={collectionItems}
+              sort={collectionSort}
+              onSort={setCollectionSort}
+              tileSize={tileSize}
+              onSelect={setSelected}
+              onBrowse={() => setView('search')}
+            />
+          ) : view === 'search' ? (
+            <SearchView
+              query={query}
+              onQuery={setQuery}
+              filter={searchFilter}
+              onFilter={setSearchFilter}
+              results={search}
+              albumItems={searchAlbumItems}
+              songItems={searchSongItems}
+              artist={artist}
+              onArtist={openArtist}
+              group={artistGroup}
+              onGroup={setArtistGroup}
+              albums={artistAlbums}
+              tileSize={tileSize}
+              onSelect={setSelected}
+            />
+          ) : (
+            <>
+              <div className="toolbar">
+                <motion.h1 key={view} className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
+                  {view === 'albums' ? 'Saved on Spotify' : 'On repeat'}
+                  <span className="count">
+                    {view === 'albums'
+                      ? `${albums.items.length}${(albums.loading || albums.refreshing) && albums.items.length ? '…' : ''} albums`
+                      : trackMode === 'grouped'
+                        ? `${trackItems.length} albums · ${tracks.tracks.length} tracks`
+                        : `${tracks.tracks.length} tracks`}
+                  </span>
+                </motion.h1>
+                {view === 'albums' ? (
+                  <div className="toolbar-controls">
+                    <button
+                      className="text-btn"
+                      onClick={albums.refresh}
+                      disabled={albums.loading || albums.refreshing}
+                      title="Re-sync your saved albums from Spotify"
+                    >
+                      {albums.refreshing ? 'Syncing…' : 'Refresh'}
+                    </button>
+                    <Segmented small groupId="sort" value={sort} options={SORTS} onChange={setSort} />
+                  </div>
+                ) : (
+                  <div className="toolbar-controls">
+                    <Segmented small groupId="trackMode" value={trackMode} options={TRACK_MODES} onChange={setTrackMode} />
+                    <Segmented small groupId="range" value={range} options={RANGES} onChange={setRange} />
+                  </div>
+                )}
+              </div>
+
+              {error && <p className="error">Couldn’t load from Spotify: {error.message}</p>}
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={view === 'albums' ? `a-${sort}` : `t-${range}-${trackMode}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                >
+                  <ArtGrid items={items} loading={loading} tileSize={tileSize} onSelect={setSelected} />
+                </motion.div>
+              </AnimatePresence>
+
+              {!loading && !error && items.length === 0 && (
+                <p className="empty">
+                  {view === 'albums' ? 'No saved albums yet — save a few in Spotify and come back.' : 'Not enough listening history for this range yet.'}
+                </p>
               )}
-            </div>
+            </>
+          )}
+        </main>
 
-            {error && <p className="error">Couldn’t load from Spotify: {error.message}</p>}
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={view === 'albums' ? `a-${sort}` : `t-${range}-${trackMode}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.15 } }}
-              >
-                <ArtGrid items={items} loading={loading} tileSize={tileSize} onSelect={setSelected} />
-              </motion.div>
-            </AnimatePresence>
-
-            {!loading && !error && items.length === 0 && (
-              <p className="empty">
-                {view === 'albums' ? 'No saved albums yet — save a few in Spotify and come back.' : 'Not enough listening history for this range yet.'}
-              </p>
-            )}
-          </>
-        )}
-      </main>
-
-      <AnimatePresence>
-        {selected && <DetailOverlay key="overlay" item={selected} onClose={close} onStep={step} onArtist={openArtist} />}
-      </AnimatePresence>
-    </LayoutGroup>
+        <AnimatePresence>
+          {selected && <DetailOverlay key="overlay" item={selected} onClose={close} onStep={step} onArtist={openArtist} />}
+        </AnimatePresence>
+      </LayoutGroup>
+    </LayoutModeContext.Provider>
   );
 }
