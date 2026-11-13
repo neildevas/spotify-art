@@ -2,6 +2,7 @@ import { AnimatePresence, type PanInfo, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
+import { PlayButton } from '../player/PlayButton';
 import { useLayoutMode } from './LayoutMode';
 import type { ArtItem } from '../spotify/types';
 
@@ -114,6 +115,11 @@ export function SingleView({ items, loading, onSelect }: Props) {
             {item.year && <span className="single-year"> · {item.year}</span>}
             {item.tracks && item.tracks.length > 1 && <span className="single-year"> · {item.tracks.length} of your tracks</span>}
           </p>
+          {item.key.startsWith('record-') && item.albumId && (
+            <div className="single-play">
+              <PlayButton albumId={item.albumId} variant="large" />
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 

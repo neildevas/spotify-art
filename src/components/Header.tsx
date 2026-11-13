@@ -17,8 +17,7 @@ type Props = {
 
 const TABS: { id: View; label: string }[] = [
   { id: 'collection', label: 'Collection' },
-  { id: 'albums', label: 'Saved albums' },
-  { id: 'tracks', label: 'Top tracks' },
+  // { id: 'tracks', label: 'Top tracks' },
   { id: 'search', label: 'Search' },
 ];
 

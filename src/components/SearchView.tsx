@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { pickImageSet } from '../spotify/api';
 import type { SearchFilter } from '../hooks/useLibrary';
 import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
@@ -40,21 +39,6 @@ type Props = {
 
 export function SearchView(props: Props) {
   return props.artist ? <ArtistPage {...props} artist={props.artist} /> : <SearchResults {...props} />;
-}
-
-/** Round portrait shared between the result card and the artist page header (same layoutId). */
-function Portrait({ artist, size }: { artist: Artist; size: 'card' | 'hero' }) {
-  const { image, thumb } = pickImageSet(artist.images);
-  const src = size === 'hero' ? image : thumb;
-  return (
-    <motion.div
-      className={`portrait portrait-${size}`}
-      layoutId={`artist-${artist.id}`}
-      transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-    >
-      {src ? <img src={src} alt="" draggable={false} /> : <span>{artist.name[0]}</span>}
-    </motion.div>
-  );
 }
 
 function SearchResults({
@@ -106,20 +90,30 @@ function SearchResults({
 
       {show('artist') && (hasQuery || results.artists.length > 0) && (
         <Section title="Artists" count={results.artists.length} onMore={filter === 'all' ? () => onFilter('artist') : undefined}>
-          <ul className={filter === 'all' ? 'artist-row' : 'artist-grid'}>
+          {/* Type only, no photos: names set like an index, the hovered one stays bright */}
+          <ul className={filter === 'all' ? 'artist-index' : 'artist-list'}>
             <AnimatePresence mode="popLayout">
               {results.artists.map((a, i) => (
                 <motion.li
                   key={a.id}
-                  layout
-                  initial={{ opacity: 0, y: 16, filter: 'blur(6px)' }}
+                  layout="position"
+                  initial={{ opacity: 0, y: 12, filter: 'blur(6px)' }}
                   animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-                  transition={{ duration: 0.45, ease, delay: (i % 10) * 0.035 }}
+                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                  transition={{ duration: 0.45, ease, delay: (i % 10) * 0.03 }}
                 >
-                  <button className="artist-card" onClick={() => onArtist(a)}>
-                    <Portrait artist={a} size="card" />
-                    <span className="artist-name">{a.name}</span>
+                  <button className="artist-link-row" onClick={() => onArtist(a)}>
+                    <motion.span
+                      className="artist-index-name"
+                      layoutId={`artist-${a.id}`}
+                      transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+                    >
+                      {a.name}
+                    </motion.span>
+                    {filter !== 'all' && <span className="artist-genre">{a.genres?.slice(0, 2).join(', ')}</span>}
+                    <span className="artist-arrow" aria-hidden>
+                      →
+                    </span>
                   </button>
                 </motion.li>
               ))}
@@ -233,8 +227,6 @@ function LoadMore({ onVisible, loading }: { onVisible: () => void; loading: bool
 }
 
 function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSelect }: Props & { artist: Artist }) {
-  const { image } = pickImageSet(artist.images);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Only step back to results when no album overlay is open (it handles its own Escape).
@@ -246,16 +238,6 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
 
   return (
     <div className="artist-page">
-      {image && (
-        <motion.div
-          className="artist-bloom"
-          style={{ backgroundImage: `url("${image}")` }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.35 }}
-          transition={{ duration: 1.2, ease }}
-          aria-hidden
-        />
-      )}
 
       <motion.button
         className="back"
@@ -267,27 +249,29 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
       </motion.button>
 
       <header className="artist-hero">
-        <Portrait artist={artist} size="hero" />
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease, delay: 0.1 }}
-        >
-          <h1 className="view-title">
-            {artist.name}
+        <div>
+          <h1 className="view-title artist-title">
+            <motion.span layoutId={`artist-${artist.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
+              {artist.name}
+            </motion.span>
             <span className="count">
               {albums.items.length}
               {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
             </span>
           </h1>
           {!!artist.genres?.length && (
-            <ul className="overlay-meta artist-genres">
+            <motion.ul
+              className="overlay-meta artist-genres"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease, delay: 0.15 }}
+            >
               {artist.genres.slice(0, 4).map((g) => (
                 <li key={g}>{g}</li>
               ))}
-            </ul>
+            </motion.ul>
           )}
-        </motion.div>
+        </div>
         <div className="artist-controls">
           <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
         </div>

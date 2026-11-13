@@ -4,13 +4,23 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined;
 const REDIRECT_URI =
   (import.meta.env.VITE_SPOTIFY_REDIRECT_URI as string | undefined) ?? `${window.location.origin}/callback`;
-const SCOPES = ['user-library-read', 'user-top-read'];
+const SCOPES = [
+  'user-library-read',
+  'user-top-read',
+  // Playback in the browser (Web Playback SDK) + starting it via the Web API
+  'streaming',
+  'user-read-email',
+  'user-read-private',
+  'user-read-playback-state',
+  'user-modify-playback-state',
+];
+export const PLAYBACK_SCOPES = ['streaming', 'user-modify-playback-state'];
 
 const TOKEN_KEY = 'sleeve.token';
 const VERIFIER_KEY = 'sleeve.verifier';
 const STATE_KEY = 'sleeve.state';
 
-type StoredToken = { access_token: string; refresh_token: string; expires_at: number };
+type StoredToken = { access_token: string; refresh_token: string; expires_at: number; scope?: string };
 
 export const isConfigured = Boolean(CLIENT_ID && CLIENT_ID !== 'your_client_id_here');
 
@@ -37,15 +47,22 @@ function readToken(): StoredToken | null {
   }
 }
 
-function saveToken(data: { access_token: string; refresh_token?: string; expires_in: number }) {
+function saveToken(data: { access_token: string; refresh_token?: string; expires_in: number; scope?: string }) {
   const prev = readToken();
   const token: StoredToken = {
     access_token: data.access_token,
     // Spotify may or may not rotate the refresh token — keep the old one if not.
     refresh_token: data.refresh_token ?? prev?.refresh_token ?? '',
     expires_at: Date.now() + data.expires_in * 1000,
+    scope: data.scope ?? prev?.scope,
   };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+}
+
+/** Whether the current session was granted these scopes (older sessions predate playback). */
+export function hasScopes(scopes: string[]) {
+  const granted = (readToken()?.scope ?? '').split(' ');
+  return scopes.every((s) => granted.includes(s));
 }
 
 export function hasSession() {

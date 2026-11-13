@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { isValidElement, useEffect, useRef } from 'react';
 import { useAlbumTracks } from '../hooks/useAlbumTracks';
+import { PlayButton } from '../player/PlayButton';
+import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
@@ -21,6 +23,9 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
   const fetched = useAlbumTracks(item.tracks ? undefined : item.albumId);
   const tracklist = item.tracks ?? fetched;
   const listRef = useRef<HTMLOListElement>(null);
+  const player = usePlayer();
+  // Playback is enabled for records in the Collection tab.
+  const playable = item.key.startsWith('record-') && !!item.albumId && !player.needsReconnect;
 
   useEffect(() => {
     listRef.current?.querySelector('.is-current')?.scrollIntoView({ block: 'nearest' });
@@ -121,18 +126,41 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
             </ul>,
             tracklist?.length ? (
               <ol className="tracklist" key="tl" ref={listRef}>
-                {tracklist.map((t) => (
-                  <li key={t.id ?? t.rank} className={t.id && t.id === item.highlightTrackId ? 'is-current' : ''}>
-                    <span className="tl-rank">{t.rank}</span>
-                    <a href={t.url} target="_blank" rel="noreferrer" className="tl-title">
-                      {t.title}
-                    </a>
+                {tracklist.map((t, i) => (
+                  <li
+                    key={t.id ?? t.rank}
+                    className={[
+                      t.id && t.id === item.highlightTrackId ? 'is-current' : '',
+                      playable ? 'is-playable' : '',
+                      t.id && t.id === player.nowPlaying?.trackId ? 'is-playing' : '',
+                    ].join(' ')}
+                    onClick={playable ? () => player.playAlbum(item.albumId!, i) : undefined}
+                  >
+                    <span className="tl-rank">
+                      {t.id && t.id === player.nowPlaying?.trackId && !player.nowPlaying.paused ? (
+                        <span className="eq eq-sm" aria-label="Playing">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      ) : (
+                        t.rank
+                      )}
+                    </span>
+                    {playable ? (
+                      <span className="tl-title">{t.title}</span>
+                    ) : (
+                      <a href={t.url} target="_blank" rel="noreferrer" className="tl-title">
+                        {t.title}
+                      </a>
+                    )}
                     <span className="tl-dur">{t.duration}</span>
                   </li>
                 ))}
               </ol>
             ) : null,
             <div className="overlay-actions" key="l">
+              {item.key.startsWith('record-') && item.albumId && <PlayButton albumId={item.albumId} variant="large" />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗

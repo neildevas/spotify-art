@@ -1,10 +1,12 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArtGrid } from './components/ArtGrid';
-import { type CollectionSort, CollectionView } from './components/CollectionView';
+import { type CollectionSort, CollectionView, type Shelf } from './components/CollectionView';
 import { DetailOverlay } from './components/DetailOverlay';
 import { Header, Segmented, type View } from './components/Header';
 import { type LayoutMode, LayoutModeContext } from './components/LayoutMode';
+import { NowPlayingBar } from './player/NowPlayingBar';
+import { PlayerProvider } from './player/PlayerContext';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
 import {
@@ -41,12 +43,6 @@ const TRACK_MODES: { id: TrackMode; label: string }[] = [
   { id: 'grouped', label: 'By album' },
   { id: 'tracks', label: 'By track' },
 ];
-const SORTS: { id: Sort; label: string }[] = [
-  { id: 'recent', label: 'Recent' },
-  { id: 'artist', label: 'Artist' },
-  { id: 'year', label: 'Year' },
-];
-
 function sortItems(items: ArtItem[], sort: Sort) {
   if (sort === 'recent') return items;
   const copy = [...items];
@@ -94,15 +90,22 @@ export default function App() {
   }, []);
 
   if (!authed) return <Login error={authError} />;
-  return <Wall onSignOut={signOut} />;
+  return (
+    <PlayerProvider>
+      <Wall onSignOut={signOut} />
+      <NowPlayingBar />
+    </PlayerProvider>
+  );
 }
 
 function Wall({ onSignOut }: { onSignOut: () => void }) {
-  const [view, setView] = usePersisted<View>('sleeve.view', 'albums');
+  const [storedView, setView] = usePersisted<View>('sleeve.view', 'collection');
+  // "Saved albums" now lives inside Collection as its own shelf.
+  const view: View = storedView === 'albums' ? 'collection' : storedView;
+  const [shelf, setShelf] = usePersisted<Shelf>('sleeve.shelf', storedView === 'albums' ? 'spotify' : 'records');
   const [tileSize, setTileSize] = usePersisted('sleeve.tile', 180);
   const [layout, setLayout] = usePersisted<LayoutMode>('sleeve.layout', 'grid');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
-  const [sort, setSort] = usePersisted<Sort>('sleeve.sort', 'recent');
   const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
   const records = useCollection();
   const [trackMode, setTrackMode] = usePersisted<TrackMode>('sleeve.trackMode', 'grouped');
@@ -118,12 +121,12 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   }, []);
 
   // Only touch the library when that tab is actually open.
-  const albums = useSavedAlbums(view === 'albums', onSignOut);
+  const albums = useSavedAlbums(view === 'collection' && shelf === 'spotify', onSignOut);
   const tracks = useTopTracks(view === 'tracks', range, onSignOut);
   const search = useSearch(query, searchFilter, onSignOut);
   const artistAlbums = useArtistAlbums(artist?.id ?? null, artistGroup, onSignOut);
 
-  const albumItems = useMemo(() => sortItems(albums.items, sort), [albums.items, sort]);
+  const albumItems = useMemo(() => sortItems(albums.items, collectionSort), [albums.items, collectionSort]);
   // Records are stored newest-first, so "recent" is already in order.
   const collectionItems = useMemo(() => sortItems(records.map(recordToItem), collectionSort), [records, collectionSort]);
 
@@ -137,9 +140,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
 
   const items =
     view === 'collection'
-      ? collectionItems
-      : view === 'albums'
-        ? albumItems
+      ? shelf === 'records'
+        ? collectionItems
+        : albumItems
       : view === 'tracks'
         ? trackItems
         : artist
@@ -161,8 +164,6 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     },
     [setView],
   );
-  const loading = view === 'albums' ? albums.loading : tracks.loading;
-  const error = view === 'albums' ? albums.error : tracks.error;
 
   const step = useCallback(
     (dir: -1 | 1) =>
@@ -196,7 +197,13 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         <main className="main">
           {view === 'collection' ? (
             <CollectionView
-              items={collectionItems}
+              shelf={shelf}
+              onShelf={(s) => {
+                setSelected(null);
+                setShelf(s);
+              }}
+              records={collectionItems}
+              spotify={{ ...albums, items: albumItems }}
               sort={collectionSort}
               onSort={setCollectionSort}
               tileSize={tileSize}
@@ -224,52 +231,34 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
             <>
               <div className="toolbar">
                 <motion.h1 key={view} className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
-                  {view === 'albums' ? 'Saved on Spotify' : 'On repeat'}
+                  On repeat
                   <span className="count">
-                    {view === 'albums'
-                      ? `${albums.items.length}${(albums.loading || albums.refreshing) && albums.items.length ? '…' : ''} albums`
-                      : trackMode === 'grouped'
-                        ? `${trackItems.length} albums · ${tracks.tracks.length} tracks`
-                        : `${tracks.tracks.length} tracks`}
+                    {trackMode === 'grouped'
+                      ? `${trackItems.length} albums · ${tracks.tracks.length} tracks`
+                      : `${tracks.tracks.length} tracks`}
                   </span>
                 </motion.h1>
-                {view === 'albums' ? (
-                  <div className="toolbar-controls">
-                    <button
-                      className="text-btn"
-                      onClick={albums.refresh}
-                      disabled={albums.loading || albums.refreshing}
-                      title="Re-sync your saved albums from Spotify"
-                    >
-                      {albums.refreshing ? 'Syncing…' : 'Refresh'}
-                    </button>
-                    <Segmented small groupId="sort" value={sort} options={SORTS} onChange={setSort} />
-                  </div>
-                ) : (
-                  <div className="toolbar-controls">
-                    <Segmented small groupId="trackMode" value={trackMode} options={TRACK_MODES} onChange={setTrackMode} />
-                    <Segmented small groupId="range" value={range} options={RANGES} onChange={setRange} />
-                  </div>
-                )}
+                <div className="toolbar-controls">
+                  <Segmented small groupId="trackMode" value={trackMode} options={TRACK_MODES} onChange={setTrackMode} />
+                  <Segmented small groupId="range" value={range} options={RANGES} onChange={setRange} />
+                </div>
               </div>
 
-              {error && <p className="error">Couldn’t load from Spotify: {error.message}</p>}
+              {tracks.error && <p className="error">Couldn’t load from Spotify: {tracks.error.message}</p>}
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={view === 'albums' ? `a-${sort}` : `t-${range}-${trackMode}`}
+                  key={`t-${range}-${trackMode}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, transition: { duration: 0.15 } }}
                 >
-                  <ArtGrid items={items} loading={loading} tileSize={tileSize} onSelect={setSelected} />
+                  <ArtGrid items={items} loading={tracks.loading} tileSize={tileSize} onSelect={setSelected} />
                 </motion.div>
               </AnimatePresence>
 
-              {!loading && !error && items.length === 0 && (
-                <p className="empty">
-                  {view === 'albums' ? 'No saved albums yet — save a few in Spotify and come back.' : 'Not enough listening history for this range yet.'}
-                </p>
+              {!tracks.loading && !tracks.error && items.length === 0 && (
+                <p className="empty">Not enough listening history for this range yet.</p>
               )}
             </>
           )}

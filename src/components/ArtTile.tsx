@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { memo, useState } from 'react';
 import { useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
+import { PlayButton } from '../player/PlayButton';
 import type { ArtItem } from '../spotify/types';
 
 type Props = {
@@ -27,7 +28,7 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth 
 
   return (
     <motion.li
-      className={`tile${featured ? ' tile-featured' : ''}`}
+      className={`tile${featured ? ' tile-featured' : ''}${item.key.startsWith('record-') ? ' tile-playable' : ''}`}
       layout="position"
       initial={{ opacity: 0, y: 18, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -76,6 +77,8 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth 
         {item.rank && <span className="tile-rank">{item.rank}</span>}
         {item.tracks && item.tracks.length > 1 && <span className="tile-count">{item.tracks.length} tracks</span>}
         {showMark && <span className="tile-collected" title="In your collection" aria-label="In your collection" />}
+        {/* Playback starts in the Collection tab */}
+        {item.key.startsWith('record-') && item.albumId && <PlayButton albumId={item.albumId} />}
 
         <span className="tile-caption">
           <span className="tile-title">{item.title}</span>

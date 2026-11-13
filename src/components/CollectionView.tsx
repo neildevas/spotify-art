@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { collection } from '../collection/store';
 import type { ArtItem } from '../spotify/types';
@@ -6,6 +6,8 @@ import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
 
 export type CollectionSort = 'recent' | 'artist' | 'year';
+/** The two shelves of the collection: records you've added here, and albums saved in Spotify. */
+export type Shelf = 'records' | 'spotify';
 
 const SORTS: { id: CollectionSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
@@ -13,8 +15,21 @@ const SORTS: { id: CollectionSort; label: string }[] = [
   { id: 'year', label: 'Year' },
 ];
 
-type Props = {
+const ease = [0.22, 1, 0.36, 1] as const;
+
+type SpotifyShelf = {
   items: ArtItem[];
+  loading: boolean;
+  refreshing: boolean;
+  error: Error | null;
+  refresh: () => void;
+};
+
+type Props = {
+  shelf: Shelf;
+  onShelf: (s: Shelf) => void;
+  records: ArtItem[];
+  spotify: SpotifyShelf;
   sort: CollectionSort;
   onSort: (s: CollectionSort) => void;
   tileSize: number;
@@ -22,7 +37,7 @@ type Props = {
   onBrowse: () => void;
 };
 
-export function CollectionView({ items, sort, onSort, tileSize, onSelect, onBrowse }: Props) {
+export function CollectionView({ shelf, onShelf, records, spotify, sort, onSort, tileSize, onSelect, onBrowse }: Props) {
   const file = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -44,57 +59,106 @@ export function CollectionView({ items, sort, onSort, tileSize, onSelect, onBrow
     }
   };
 
+  const items = shelf === 'records' ? records : spotify.items;
+  const spotifyCount = `${spotify.items.length}${(spotify.loading || spotify.refreshing) && spotify.items.length ? '…' : ''}`;
+
   return (
     <>
       <div className="toolbar">
-        <motion.h1 className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
-          Your records
-          <span className="count">
-            {items.length} record{items.length === 1 ? '' : 's'}
-          </span>
-        </motion.h1>
+        {/* The page title doubles as the shelf switch */}
+        <h1 className="view-title shelf-switch" role="tablist">
+          <ShelfTab active={shelf === 'records'} onClick={() => onShelf('records')} label="Your records" count={String(records.length)} />
+          <ShelfTab
+            active={shelf === 'spotify'}
+            onClick={() => onShelf('spotify')}
+            label="Saved on Spotify"
+            count={spotify.items.length ? spotifyCount : ''}
+          />
+        </h1>
+
         <div className="collection-tools">
           {items.length > 0 && <Segmented small groupId="collectionSort" value={sort} options={SORTS} onChange={onSort} />}
-          {items.length > 0 && (
-            <button className="text-btn" onClick={exportCollection} title="Download a backup of your collection">
-              Export
+          {shelf === 'records' ? (
+            <>
+              {records.length > 0 && (
+                <button className="text-btn" onClick={exportCollection} title="Download a backup of your records">
+                  Export
+                </button>
+              )}
+              <button className="text-btn" onClick={() => file.current?.click()} title="Load a records backup">
+                Import
+              </button>
+              <input
+                ref={file}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) importCollection(f);
+                  e.target.value = '';
+                }}
+              />
+            </>
+          ) : (
+            <button
+              className="text-btn"
+              onClick={spotify.refresh}
+              disabled={spotify.loading || spotify.refreshing}
+              title="Re-sync your saved albums from Spotify"
+            >
+              {spotify.refreshing ? 'Syncing…' : 'Refresh'}
             </button>
           )}
-          <button className="text-btn" onClick={() => file.current?.click()} title="Load a collection backup">
-            Import
-          </button>
-          <input
-            ref={file}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importCollection(f);
-              e.target.value = '';
-            }}
-          />
         </div>
       </div>
 
-      {note && <p className="search-hint">{note}</p>}
-
-      {items.length === 0 ? (
-        <motion.div className="empty-collection" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h2>An empty crate</h2>
-          <p>
-            Open any album, single or EP — from your library, top tracks or search — and hit{' '}
-            <strong>Add to collection</strong>. It stays here, in this browser, not on Spotify.
-          </p>
-          <button className="btn-collect" onClick={onBrowse}>
-            Start digging
-          </button>
-        </motion.div>
-      ) : (
-        <motion.div key={sort} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <ArtGrid items={items} loading={false} tileSize={tileSize} onSelect={onSelect} />
-        </motion.div>
+      {shelf === 'records' && note && <p className="search-hint">{note}</p>}
+      {shelf === 'spotify' && spotify.error && (
+        <p className="error">Couldn’t load from Spotify: {spotify.error.message}</p>
       )}
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`${shelf}-${sort}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          transition={{ duration: 0.35, ease }}
+        >
+          {shelf === 'records' && records.length === 0 ? (
+            <div className="empty-collection">
+              <h2>An empty crate</h2>
+              <p>
+                Open any album, single or EP — from your Spotify saves or search — and hit{' '}
+                <strong>Add to collection</strong>. It stays here, in this browser, not on Spotify.
+              </p>
+              <div className="empty-actions">
+                <button className="btn-collect" onClick={onBrowse}>
+                  Start digging
+                </button>
+                <button className="btn-ghost" onClick={() => onShelf('spotify')}>
+                  Look through your Spotify saves
+                </button>
+              </div>
+            </div>
+          ) : shelf === 'spotify' && !spotify.loading && !spotify.error && spotify.items.length === 0 ? (
+            <p className="empty">No saved albums yet — save a few in Spotify and come back.</p>
+          ) : (
+            <ArtGrid items={items} loading={shelf === 'spotify' && spotify.loading} tileSize={tileSize} onSelect={onSelect} />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </>
+  );
+}
+
+function ShelfTab({ active, onClick, label, count }: { active: boolean; onClick: () => void; label: string; count: string }) {
+  return (
+    <button role="tab" aria-selected={active} className={`shelf-tab ${active ? 'is-active' : ''}`} onClick={onClick}>
+      {label}
+      {count && <sup className="shelf-count">{count}</sup>}
+      {active && <motion.span layoutId="shelf-underline" className="shelf-underline" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />}
+    </button>
   );
 }

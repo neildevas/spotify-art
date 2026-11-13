@@ -24,7 +24,7 @@ export class AuthError extends Error {}
  * Spotify rate-limits groups of endpoints separately (the groups aren't published), so we back off
  * per area instead of globally: a limit on artist pages shouldn't block search, and vice versa.
  */
-type Bucket = 'search' | 'artists' | 'albums' | 'top' | 'library' | 'profile' | 'other';
+type Bucket = 'search' | 'artists' | 'albums' | 'top' | 'library' | 'profile' | 'player' | 'other';
 
 const BUCKET_LABEL: Record<Bucket, string> = {
   search: 'search',
@@ -33,6 +33,7 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   top: 'top tracks',
   library: 'your saved albums',
   profile: 'your profile',
+  player: 'playback',
   other: 'this request',
 };
 
@@ -42,6 +43,7 @@ function bucketFor(path: string): Bucket {
   if (p.startsWith('/artists')) return 'artists';
   if (p.startsWith('/albums')) return 'albums';
   if (p.startsWith('/me/top')) return 'top';
+  if (p.startsWith('/me/player')) return 'player';
   if (p.startsWith('/me/albums')) return 'library';
   if (p === '/me' || p.startsWith('/me?')) return 'profile';
   return 'other';
@@ -88,7 +90,9 @@ async function readReason(res: Response): Promise<string | undefined> {
   }
 }
 
-async function spotify<T>(path: string, attempt = 0): Promise<T> {
+type RequestInit = { method?: 'GET' | 'PUT' | 'POST'; body?: unknown };
+
+async function spotify<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const bucket = bucketFor(path);
   const pause = pausedUntil.get(bucket);
   const waitMs = pause ? pause.until - Date.now() : 0;
@@ -100,7 +104,12 @@ async function spotify<T>(path: string, attempt = 0): Promise<T> {
   if (!token) throw new AuthError('Not signed in');
 
   const res = await fetch(path.startsWith('http') ? path : `${BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: init.method ?? 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
 
   if (res.status === 401) {
@@ -121,12 +130,14 @@ async function spotify<T>(path: string, attempt = 0): Promise<T> {
     // Only retry quietly when Spotify told us exactly how long, and it's short.
     if (!quota && !estimated && retryAfter <= SHORT_WAIT_SEC && attempt < 2) {
       await sleep(retryAfter * 1000);
-      return spotify<T>(path, attempt + 1);
+      return spotify<T>(path, init, attempt + 1);
     }
     throw new RateLimitError(retryAfter, BUCKET_LABEL[bucket], quota, estimated);
   }
   if (!res.ok) throw new Error(`Spotify ${res.status}: ${await res.text()}`);
-  return res.json() as Promise<T>;
+  if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Cached GET. Same path = same request, shared and reused until it's older than `ttlMs`. */
@@ -136,6 +147,16 @@ const get = <T,>(path: string, ttlMs: number, persist = false) =>
 export const getMe = () => get<User>('/me', 24 * HOUR, true);
 
 /** One-album peek at the library: cheap way to tell whether a cached library is still current. */
+/**
+ * Start an album on the given device (our in-browser player), optionally at a track index.
+ * This is the only Web API call playback needs; pause/skip/seek/volume go through the SDK.
+ */
+export const playAlbum = (deviceId: string, albumId: string, position = 0) =>
+  spotify<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+    method: 'PUT',
+    body: { context_uri: `spotify:album:${albumId}`, offset: { position } },
+  });
+
 export const savedAlbumsHead = () => spotify<Paging<SavedAlbum>>('/me/albums?limit=1');
 
 /** Yields saved albums page by page (50 at a time) so the grid can fill in progressively. */
