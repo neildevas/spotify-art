@@ -1,6 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArtGrid } from './components/ArtGrid';
+import { ArtistsView } from './components/ArtistsView';
 import { type CollectionSort, CollectionView, type Shelf } from './components/CollectionView';
 import { DetailOverlay } from './components/DetailOverlay';
 import { Header, Segmented, type View } from './components/Header';
@@ -17,7 +18,7 @@ import {
   useSearch,
   useTopTracks,
 } from './hooks/useLibrary';
-import { useCollection } from './collection/store';
+import { type SavedArtist, useCollection, useSavedArtists } from './collection/store';
 import { clearCache } from './spotify/cache';
 import {
   getArtist,
@@ -102,12 +103,18 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [storedView, setView] = usePersisted<View>('sleeve.view', 'collection');
   // "Saved albums" now lives inside Collection as its own shelf.
   const view: View = storedView === 'albums' ? 'collection' : storedView;
-  const [shelf, setShelf] = usePersisted<Shelf>('sleeve.shelf', storedView === 'albums' ? 'spotify' : 'records');
+  const [storedShelf, setShelf] = usePersisted<Shelf | 'artists'>('sleeve.shelf', storedView === 'albums' ? 'spotify' : 'records');
+  // Saved artists used to be a Collection shelf; they have their own tab now.
+  const shelf: Shelf = storedShelf === 'artists' ? 'records' : storedShelf;
+  const [artistsSort, setArtistsSort] = usePersisted<CollectionSort>('sleeve.artistsSort', 'recent');
   const [tileSize, setTileSize] = usePersisted('sleeve.tile', 180);
   const [layout, setLayout] = usePersisted<LayoutMode>('sleeve.layout', 'grid');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
   const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
   const records = useCollection();
+  const artistShelf = useSavedArtists();
+  // Where the open artist page was reached from, so its back link returns there.
+  const [artistOrigin, setArtistOrigin] = useState<'search' | 'artists'>('search');
   const [trackMode, setTrackMode] = usePersisted<TrackMode>('sleeve.trackMode', 'grouped');
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
@@ -125,6 +132,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const tracks = useTopTracks(view === 'tracks', range, onSignOut);
   const search = useSearch(query, searchFilter, onSignOut);
   const artistAlbums = useArtistAlbums(artist?.id ?? null, artistGroup, onSignOut);
+  // An artist opened from the Artists tab shows there, so the header stays on Artists.
+  const artistInArtistsTab = view === 'artists' && !!artist && artistOrigin === 'artists';
 
   const albumItems = useMemo(() => sortItems(albums.items, collectionSort), [albums.items, collectionSort]);
   // Records are stored newest-first, so "recent" is already in order.
@@ -139,7 +148,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const searchSongItems = useMemo(() => search.tracks.map(searchTrackToItem), [search.tracks]);
 
   const items =
-    view === 'collection'
+    artistInArtistsTab
+      ? artistAlbums.items
+      : view === 'collection'
       ? shelf === 'records'
         ? collectionItems
         : albumItems
@@ -151,18 +162,38 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
 
   /** Opens an artist page from anywhere. Name-only refs get their portrait and genres fetched. */
   const openArtist = useCallback(
-    (a: Artist | { id: string; name: string } | null) => {
+    (a: Artist | { id: string; name: string } | null, origin: 'search' | 'artists' = 'search') => {
       setSelected(null);
       window.scrollTo({ top: 0 });
-      if (!a) return setArtist(null);
-      setView('search');
+      if (!a) {
+        // Back from an artist page: return to wherever it was opened from.
+        if (artistOrigin === 'artists') setView('artists');
+        return setArtist(null);
+      }
+      setArtistOrigin(origin);
+      setView(origin);
       if ('images' in a) return setArtist(a);
       setArtist({ id: a.id, name: a.name, images: [], external_urls: { spotify: '' } });
       getArtist(a.id)
         .then((full) => setArtist((cur) => (cur?.id === full.id ? full : cur)))
         .catch(() => {});
     },
-    [setView],
+    [setView, artistOrigin],
+  );
+
+  const openSavedArtist = useCallback(
+    (a: SavedArtist) =>
+      openArtist(
+        {
+          id: a.id,
+          name: a.name,
+          genres: a.genres,
+          images: a.image ? [{ url: a.image, width: 640, height: 640 }] : [],
+          external_urls: { spotify: '' },
+        },
+        'artists',
+      ),
+    [openArtist],
   );
 
   const step = useCallback(
@@ -184,6 +215,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
           view={view}
           onView={(v) => {
             setSelected(null);
+            // An artist page opened from the Artists tab belongs to that visit; leaving the tab closes it.
+            if (artistOrigin === 'artists') setArtist(null);
             setView(v);
           }}
           tileSize={tileSize}
@@ -195,7 +228,33 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         />
 
         <main className="main">
-          {view === 'collection' ? (
+          {artistInArtistsTab ? (
+            <SearchView
+              query={query}
+              onQuery={setQuery}
+              filter={searchFilter}
+              onFilter={setSearchFilter}
+              results={search}
+              albumItems={searchAlbumItems}
+              songItems={searchSongItems}
+              artist={artist}
+              onArtist={openArtist}
+              group={artistGroup}
+              onGroup={setArtistGroup}
+              albums={artistAlbums}
+              tileSize={tileSize}
+              onSelect={setSelected}
+              backLabel="Artists"
+            />
+          ) : view === 'artists' ? (
+            <ArtistsView
+              artists={artistShelf}
+              sort={artistsSort}
+              onSort={setArtistsSort}
+              onOpenArtist={openSavedArtist}
+              onBrowse={() => setView('search')}
+            />
+          ) : view === 'collection' ? (
             <CollectionView
               shelf={shelf}
               onShelf={(s) => {

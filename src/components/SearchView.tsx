@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import type { SearchFilter } from '../hooks/useLibrary';
+import { pickImageSet } from '../spotify/api';
 import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
+import { SaveArtistButton } from './SaveArtistButton';
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -20,6 +22,14 @@ const FILTERS: { id: SearchFilter; label: string }[] = [
   { id: 'track', label: 'Songs' },
 ];
 
+// Short enough to fit the big serif field at any width; the filter below says what's being searched.
+const PLACEHOLDERS: Record<SearchFilter, string> = {
+  all: 'Find something',
+  artist: 'Find an artist',
+  album: 'Find an album',
+  track: 'Find a song',
+};
+
 type Props = {
   query: string;
   onQuery: (q: string) => void;
@@ -35,6 +45,8 @@ type Props = {
   albums: { items: ArtItem[]; loading: boolean; error: Error | null; hasMore: boolean; loadMore: () => void };
   tileSize: number;
   onSelect: (item: ArtItem) => void;
+  /** Where the artist page's back link goes ("Search" or "Collection"). */
+  backLabel?: string;
 };
 
 export function SearchView(props: Props) {
@@ -67,7 +79,7 @@ function SearchResults({
           ref={input}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search artists, albums, songs"
+          placeholder={PLACEHOLDERS[filter]}
           spellCheck={false}
           aria-label="Search"
         />
@@ -226,7 +238,34 @@ function LoadMore({ onVisible, loading }: { onVisible: () => void; loading: bool
   );
 }
 
-function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSelect }: Props & { artist: Artist }) {
+/** The artist's photo, only on their own page. Fades in once loaded; nothing shows if Spotify has none. */
+function ArtistPhoto({ artist }: { artist: Artist }) {
+  const { image } = pickImageSet(artist.images);
+  const [loaded, setLoaded] = useState(false);
+  if (!image) return null;
+  return (
+    <motion.div
+      key={image}
+      className="artist-photo"
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: loaded ? 1 : 0, scale: loaded ? 1 : 0.94 }}
+      transition={{ duration: 0.6, ease }}
+    >
+      <img src={image} alt={artist.name} draggable={false} onLoad={() => setLoaded(true)} />
+    </motion.div>
+  );
+}
+
+function ArtistPage({
+  artist,
+  onArtist,
+  group,
+  onGroup,
+  albums,
+  tileSize,
+  onSelect,
+  backLabel = 'Search',
+}: Props & { artist: Artist }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Only step back to results when no album overlay is open (it handles its own Escape).
@@ -245,10 +284,11 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
       >
-        ← Search
+        ← {backLabel}
       </motion.button>
 
       <header className="artist-hero">
+        <ArtistPhoto artist={artist} />
         <div>
           <h1 className="view-title artist-title">
             <motion.span layoutId={`artist-${artist.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
@@ -271,6 +311,9 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
               ))}
             </motion.ul>
           )}
+          <div className="artist-save">
+            <SaveArtistButton artist={artist} />
+          </div>
         </div>
         <div className="artist-controls">
           <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />

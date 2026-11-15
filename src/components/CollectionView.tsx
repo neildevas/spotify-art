@@ -37,7 +37,17 @@ type Props = {
   onBrowse: () => void;
 };
 
-export function CollectionView({ shelf, onShelf, records, spotify, sort, onSort, tileSize, onSelect, onBrowse }: Props) {
+export function CollectionView({
+  shelf,
+  onShelf,
+  records,
+  spotify,
+  sort,
+  onSort,
+  tileSize,
+  onSelect,
+  onBrowse,
+}: Props) {
   const file = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
 

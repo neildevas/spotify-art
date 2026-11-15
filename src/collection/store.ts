@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { CollectedRecord, RecordInfo } from '../spotify/types';
+import type { Artist, CollectedRecord, RecordInfo } from '../spotify/types';
 
 /**
  * The user's own record collection. Lives in this browser's localStorage, never on Spotify.
@@ -10,6 +10,37 @@ const KEY = 'sleeve.collection.v1';
 
 let records: CollectedRecord[] = load();
 const listeners = new Set<() => void>();
+
+/** Artists saved from their artist page — a shortcut back to all their releases. */
+export type SavedArtist = {
+  id: string;
+  name: string;
+  genres?: string[];
+  image?: string; // only shown on the artist's own page
+  addedAt: number;
+};
+
+const ARTISTS_KEY = 'sleeve.artists.v1';
+let artists: SavedArtist[] = loadArtists();
+
+function loadArtists(): SavedArtist[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ARTISTS_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function commitArtists(next: SavedArtist[]) {
+  artists = next;
+  try {
+    localStorage.setItem(ARTISTS_KEY, JSON.stringify(artists));
+  } catch {
+    /* keep the in-memory copy */
+  }
+  listeners.forEach((l) => l());
+}
 
 function load(): CollectedRecord[] {
   try {
@@ -34,8 +65,9 @@ function commit(next: CollectedRecord[]) {
 function subscribe(listener: () => void) {
   listeners.add(listener);
   const onStorage = (e: StorageEvent) => {
-    if (e.key !== KEY) return;
-    records = load();
+    if (e.key === KEY) records = load();
+    else if (e.key === ARTISTS_KEY) artists = loadArtists();
+    else return;
     listener();
   };
   window.addEventListener('storage', onStorage);
@@ -59,9 +91,9 @@ export const collection = {
   },
   /** JSON backup, since localStorage only lives in this browser. */
   exportJson() {
-    return JSON.stringify({ app: 'sleeve', version: 1, records }, null, 2);
+    return JSON.stringify({ app: 'sleeve', version: 2, records, artists }, null, 2);
   },
-  /** Merges a backup in; existing records are kept. Returns how many were new. */
+  /** Merges a backup in (records and saved artists); existing items are kept. Returns how many were new. */
   importJson(text: string) {
     const data = JSON.parse(text);
     const incoming: CollectedRecord[] = Array.isArray(data) ? data : data?.records;
@@ -69,7 +101,13 @@ export const collection = {
     const have = new Set(records.map((r) => r.id));
     const fresh = incoming.filter((r) => r && typeof r.id === 'string' && r.image && !have.has(r.id));
     commit([...records, ...fresh].sort((a, b) => b.addedAt - a.addedAt));
-    return fresh.length;
+
+    const incomingArtists: SavedArtist[] = Array.isArray(data?.artists) ? data.artists : [];
+    const haveArtists = new Set(artists.map((a) => a.id));
+    const freshArtists = incomingArtists.filter((a) => a && typeof a.id === 'string' && a.name && !haveArtists.has(a.id));
+    if (freshArtists.length) commitArtists([...artists, ...freshArtists].sort((a, b) => b.addedAt - a.addedAt));
+
+    return fresh.length + freshArtists.length;
   },
 };
 
@@ -79,4 +117,27 @@ export function useCollection() {
 
 export function useInCollection(id: string | undefined) {
   return useSyncExternalStore(subscribe, () => (id ? records.some((r) => r.id === id) : false));
+}
+
+export const savedArtists = {
+  add(a: Artist) {
+    if (artists.some((x) => x.id === a.id)) return;
+    const image = [...a.images].sort((x, y) => (y.width ?? 0) - (x.width ?? 0))[0]?.url;
+    commitArtists([{ id: a.id, name: a.name, genres: a.genres, image, addedAt: Date.now() }, ...artists]);
+  },
+  remove(id: string) {
+    commitArtists(artists.filter((x) => x.id !== id));
+  },
+  toggle(a: Artist) {
+    if (artists.some((x) => x.id === a.id)) this.remove(a.id);
+    else this.add(a);
+  },
+};
+
+export function useSavedArtists() {
+  return useSyncExternalStore(subscribe, () => artists);
+}
+
+export function useIsArtistSaved(id: string | undefined) {
+  return useSyncExternalStore(subscribe, () => (id ? artists.some((a) => a.id === id) : false));
 }
