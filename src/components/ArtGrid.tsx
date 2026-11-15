@@ -14,9 +14,22 @@ type Props = {
   skeletons?: number;
   /** Set false where one-at-a-time doesn't make sense (e.g. the mixed "All" search sections). */
   allowSingle?: boolean;
+  /** Artist pages: album ids on the top shelf, and a handler that turns on each tile's pin button. */
+  pinnedIds?: Set<string>;
+  onTogglePin?: (item: ArtItem) => void;
 };
 
-export function ArtGrid({ items, loading, tileSize, onSelect, captions, skeletons = 24, allowSingle = true }: Props) {
+export function ArtGrid({
+  items,
+  loading,
+  tileSize,
+  onSelect,
+  captions,
+  skeletons = 24,
+  allowSingle = true,
+  pinnedIds,
+  onTogglePin,
+}: Props) {
   const { mode } = useLayoutMode();
   if (mode === 'single' && allowSingle) return <SingleView items={items} loading={loading} onSelect={onSelect} />;
 
@@ -39,7 +52,15 @@ export function ArtGrid({ items, loading, tileSize, onSelect, captions, skeleton
   return (
     <ul className={cls} style={style}>
       {items.map((item, i) => (
-        <ArtTile key={item.key} item={item} index={i} onSelect={onSelect} tileWidth={tileWidth} />
+        <ArtTile
+          key={item.key}
+          item={item}
+          index={i}
+          onSelect={onSelect}
+          tileWidth={tileWidth}
+          pinned={!!item.albumId && !!pinnedIds?.has(item.albumId)}
+          onTogglePin={onTogglePin}
+        />
       ))}
     </ul>
   );

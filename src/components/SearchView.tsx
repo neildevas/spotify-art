@@ -5,6 +5,8 @@ import { pickImageSet } from '../spotify/api';
 import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
+import { savedArtists, useCollection, useSavedArtist } from '../collection/store';
+import { LinerNotes, TopShelf } from './LinerNotes';
 import { SaveArtistButton } from './SaveArtistButton';
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -122,7 +124,6 @@ function SearchResults({
                     >
                       {a.name}
                     </motion.span>
-                    {filter !== 'all' && <span className="artist-genre">{a.genres?.slice(0, 2).join(', ')}</span>}
                     <span className="artist-arrow" aria-hidden>
                       →
                     </span>
@@ -266,10 +267,18 @@ function ArtistPage({
   onSelect,
   backLabel = 'Search',
 }: Props & { artist: Artist }) {
+  // Saved artists get the appreciation page: liner notes, a top shelf and pinnable releases.
+  const saved = useSavedArtist(artist.id);
+  const records = useCollection();
+  const owned = records.filter((r) => r.artists.some((a) => a.id === artist.id)).length;
+  const pinnedIds = new Set((saved?.pinned ?? []).map((r) => r.id));
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Only step back to results when no album overlay is open (it handles its own Escape).
-      if (e.key === 'Escape' && !document.querySelector('.overlay')) onArtist(null);
+      // Only step back to results when no album overlay is open (it handles its own Escape),
+      // and not while typing liner notes.
+      const typing = document.activeElement instanceof HTMLTextAreaElement;
+      if (e.key === 'Escape' && !typing && !document.querySelector('.overlay')) onArtist(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -290,6 +299,12 @@ function ArtistPage({
       <header className="artist-hero">
         <ArtistPhoto artist={artist} />
         <div>
+          {saved && (
+            <span className="eyebrow artist-since">
+              Saved artist · since{' '}
+              {new Date(saved.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+            </span>
+          )}
           <h1 className="view-title artist-title">
             <motion.span layoutId={`artist-${artist.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
               {artist.name}
@@ -299,20 +314,9 @@ function ArtistPage({
               {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
             </span>
           </h1>
-          {!!artist.genres?.length && (
-            <motion.ul
-              className="overlay-meta artist-genres"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease, delay: 0.15 }}
-            >
-              {artist.genres.slice(0, 4).map((g) => (
-                <li key={g}>{g}</li>
-              ))}
-            </motion.ul>
-          )}
           <div className="artist-save">
             <SaveArtistButton artist={artist} />
+            {!saved && <span className="liner-hint">Save to write liner notes and pin your favourite records.</span>}
           </div>
         </div>
         <div className="artist-controls">
@@ -320,10 +324,32 @@ function ArtistPage({
         </div>
       </header>
 
+      {saved && (
+        <>
+          {/*<LinerNotes artist={saved} />*/}
+          <TopShelf artist={saved} onSelect={onSelect} />
+          <div className="section-head discography-head">
+            <h2>
+              Discography{' '}
+              <span className="count">
+                {owned ? `${owned} in your collection · ` : ''}pin records to your top shelf
+              </span>
+            </h2>
+          </div>
+        </>
+      )}
+
       {albums.error && <p className="error">Couldn’t load releases: {albums.error.message}</p>}
 
       <motion.div key={`${artist.id}-${group}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <ArtGrid items={albums.items} loading={albums.loading} tileSize={tileSize} onSelect={onSelect} />
+        <ArtGrid
+          items={albums.items}
+          loading={albums.loading}
+          tileSize={tileSize}
+          onSelect={onSelect}
+          pinnedIds={saved ? pinnedIds : undefined}
+          onTogglePin={saved ? (item) => item.record && savedArtists.togglePin(saved.id, item.record) : undefined}
+        />
       </motion.div>
 
       {albums.hasMore && (

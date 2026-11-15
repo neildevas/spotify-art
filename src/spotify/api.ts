@@ -385,3 +385,20 @@ export function recordToItem(r: CollectedRecord): ArtItem {
     record: r,
   };
 }
+
+/** A record on an artist's top shelf, as a tile/overlay item. */
+export function pinnedToItem(r: RecordInfo, rank: number): ArtItem {
+  return {
+    key: `pinned-${r.id}`,
+    image: r.image,
+    thumb: r.thumb,
+    title: r.name,
+    subtitle: artistNames(r.artists),
+    year: r.year,
+    details: [TYPE_LABEL[r.type], `${r.totalTracks} track${r.totalTracks === 1 ? '' : 's'}`, `Top shelf · No. ${rank}`],
+    url: r.url,
+    albumId: r.id,
+    artists: r.artists,
+    record: r,
+  };
+}

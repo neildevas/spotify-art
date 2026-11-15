@@ -15,9 +15,12 @@ const listeners = new Set<() => void>();
 export type SavedArtist = {
   id: string;
   name: string;
-  genres?: string[];
   image?: string; // only shown on the artist's own page
   addedAt: number;
+  /** Your liner notes: why this artist matters to you. */
+  note?: string;
+  /** Records on the artist's top shelf, in your order (first = No. 1). */
+  pinned?: RecordInfo[];
 };
 
 const ARTISTS_KEY = 'sleeve.artists.v1';
@@ -123,7 +126,7 @@ export const savedArtists = {
   add(a: Artist) {
     if (artists.some((x) => x.id === a.id)) return;
     const image = [...a.images].sort((x, y) => (y.width ?? 0) - (x.width ?? 0))[0]?.url;
-    commitArtists([{ id: a.id, name: a.name, genres: a.genres, image, addedAt: Date.now() }, ...artists]);
+    commitArtists([{ id: a.id, name: a.name, image, addedAt: Date.now() }, ...artists]);
   },
   remove(id: string) {
     commitArtists(artists.filter((x) => x.id !== id));
@@ -132,7 +135,30 @@ export const savedArtists = {
     if (artists.some((x) => x.id === a.id)) this.remove(a.id);
     else this.add(a);
   },
+  /** Keep a saved artist's name and photo current with what Spotify now says. */
+  refreshInfo(a: Artist) {
+    const cur = artists.find((x) => x.id === a.id);
+    if (!cur) return;
+    const image = [...a.images].sort((x, y) => (y.width ?? 0) - (x.width ?? 0))[0]?.url ?? cur.image;
+    if (cur.name === a.name && cur.image === image) return;
+    commitArtists(artists.map((x) => (x.id === a.id ? { ...x, name: a.name, image } : x)));
+  },
+  update(id: string, patch: Partial<Pick<SavedArtist, 'note' | 'pinned'>>) {
+    commitArtists(artists.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  },
+  togglePin(id: string, record: RecordInfo) {
+    const a = artists.find((x) => x.id === id);
+    if (!a) return;
+    const pinned = a.pinned ?? [];
+    this.update(id, {
+      pinned: pinned.some((r) => r.id === record.id) ? pinned.filter((r) => r.id !== record.id) : [...pinned, record],
+    });
+  },
 };
+
+export function useSavedArtist(id: string | undefined) {
+  return useSyncExternalStore(subscribe, () => (id ? artists.find((a) => a.id === id) : undefined));
+}
 
 export function useSavedArtists() {
   return useSyncExternalStore(subscribe, () => artists);

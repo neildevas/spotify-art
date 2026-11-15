@@ -18,10 +18,11 @@ import {
   useSearch,
   useTopTracks,
 } from './hooks/useLibrary';
-import { type SavedArtist, useCollection, useSavedArtists } from './collection/store';
+import { type SavedArtist, savedArtists, useCollection, useSavedArtists } from './collection/store';
 import { clearCache } from './spotify/cache';
 import {
   getArtist,
+  pinnedToItem,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -134,6 +135,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const artistAlbums = useArtistAlbums(artist?.id ?? null, artistGroup, onSignOut);
   // An artist opened from the Artists tab shows there, so the header stays on Artists.
   const artistInArtistsTab = view === 'artists' && !!artist && artistOrigin === 'artists';
+  const shelfPins = artist ? artistShelf.find((a) => a.id === artist.id)?.pinned : undefined;
 
   const albumItems = useMemo(() => sortItems(albums.items, collectionSort), [albums.items, collectionSort]);
   // Records are stored newest-first, so "recent" is already in order.
@@ -148,7 +150,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const searchSongItems = useMemo(() => search.tracks.map(searchTrackToItem), [search.tracks]);
 
   const items =
-    artistInArtistsTab
+    artist && (artistInArtistsTab || view === 'search') && shelfPins?.length
+      ? [...shelfPins.map((r, i) => pinnedToItem(r, i + 1)), ...artistAlbums.items]
+      : artistInArtistsTab
       ? artistAlbums.items
       : view === 'collection'
       ? shelf === 'records'
@@ -160,7 +164,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
           ? artistAlbums.items
           : [...searchAlbumItems, ...searchSongItems];
 
-  /** Opens an artist page from anywhere. Name-only refs get their portrait and genres fetched. */
+  /** Opens an artist page from anywhere. Name-only refs get their photo fetched. */
   const openArtist = useCallback(
     (a: Artist | { id: string; name: string } | null, origin: 'search' | 'artists' = 'search') => {
       setSelected(null);
@@ -187,13 +191,25 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         {
           id: a.id,
           name: a.name,
-          genres: a.genres,
           images: a.image ? [{ url: a.image, width: 640, height: 640 }] : [],
           external_urls: { spotify: '' },
         },
         'artists',
       ),
     [openArtist],
+  );
+  // Saved copies can be missing a photo (or be out of date): refresh from Spotify.
+  const openSavedArtistFresh = useCallback(
+    (a: SavedArtist) => {
+      openSavedArtist(a);
+      getArtist(a.id)
+        .then((full) => {
+          setArtist((cur) => (cur?.id === full.id ? full : cur));
+          savedArtists.refreshInfo(full);
+        })
+        .catch(() => {});
+    },
+    [openSavedArtist],
   );
 
   const step = useCallback(
@@ -251,7 +267,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               artists={artistShelf}
               sort={artistsSort}
               onSort={setArtistsSort}
-              onOpenArtist={openSavedArtist}
+              onOpenArtist={openSavedArtistFresh}
               onBrowse={() => setView('search')}
             />
           ) : view === 'collection' ? (

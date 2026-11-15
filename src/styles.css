@@ -585,7 +585,6 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .artist-list > li { border-bottom: 1px solid var(--line); }
 .artist-list .artist-link-row { display: flex; width: 100%; padding: 16px 4px; gap: 16px; }
 .artist-list .artist-index-name { font-size: clamp(26px, 3vw, 40px); }
-.artist-genre { font-size: 12px; color: var(--fg-faint); letter-spacing: 0.04em; text-transform: lowercase; }
 .artist-list .artist-arrow { margin-left: auto; font-size: 20px; }
 
 /* Spotlight, same as the album grid */
@@ -596,7 +595,6 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 
 .artist-title { font-size: clamp(48px, 7vw, 96px); }
 .artist-title > span:first-child { display: inline-block; }
-.artist-genres { margin: 14px 0 0; }
 
 /* ---------- Collection shelves ---------- */
 .shelf-switch { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: clamp(20px, 3vw, 40px); row-gap: 4px; }
@@ -636,3 +634,101 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 }
 .artist-row-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .artist-link-row:hover .artist-row-photo { transform: scale(1.05); }
+
+/* ---------- Artist appreciation: liner notes + top shelf ---------- */
+.section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.section-head h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 40px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.eyebrow.artist-since { display: block; margin-bottom: 10px; }
+.artist-save { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.liner-hint { font-size: 13px; color: var(--fg-faint); line-height: 1.6; }
+
+.liner {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 48px;
+  margin: 8px 0 56px; padding-top: 32px; border-top: 1px solid var(--line);
+}
+.liner-label { display: flex; flex-direction: column; gap: 8px; }
+.liner-text {
+  display: block; width: 100%; text-align: left; margin: 0; padding: 0;
+  font-family: var(--serif); font-style: italic; font-size: clamp(24px, 2.6vw, 36px); line-height: 1.28;
+  color: var(--fg); white-space: pre-wrap; cursor: text;
+  background: none; border: 0; outline: none; resize: none; overflow: hidden;
+}
+.liner-text.is-empty { color: #6f6d69; transition: color 0.2s; }
+.liner-text.is-empty:hover { color: var(--fg-dim); }
+.liner-input::placeholder { color: #55534f; }
+.liner-input { caret-color: var(--accent); }
+
+.shelf { margin-bottom: 56px; }
+.shelf-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.shelf-item { position: relative; display: flex; flex-direction: column; gap: 12px; cursor: grab; }
+.shelf-item:active { cursor: grabbing; }
+.shelf-art { position: relative; display: block; width: 100%; aspect-ratio: 1; cursor: pointer; }
+.shelf-cover {
+  position: absolute; inset: 0; border-radius: 8px; overflow: hidden; background: var(--bg-raised);
+  box-shadow: 0 40px 80px -30px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05);
+  transition: transform 0.35s var(--ease);
+}
+.shelf-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shelf-art:hover .shelf-cover { transform: translateY(-4px); }
+.shelf-rank {
+  position: absolute; top: 14px; left: 18px; pointer-events: none;
+  font-family: var(--serif); font-size: clamp(40px, 4.4vw, 64px); line-height: 1; color: #fff;
+  text-shadow: 0 2px 22px rgba(0,0,0,0.55);
+}
+.shelf-tools {
+  position: absolute; top: 12px; right: 12px; display: flex; gap: 2px; padding: 3px;
+  border-radius: 8px; background: rgba(18,18,20,0.9); border: 1px solid rgba(255,255,255,0.12);
+  opacity: 0; transform: translateY(-4px); transition: opacity 0.2s, transform 0.2s;
+}
+.shelf-item:hover .shelf-tools, .shelf-tools:focus-within { opacity: 1; transform: none; }
+.shelf-tools button { padding: 5px 9px; border-radius: 5px; font-size: 12px; color: var(--fg-dim); }
+.shelf-tools button:hover:not(:disabled) { color: var(--fg); background: rgba(255,255,255,0.08); }
+.shelf-tools button:disabled { opacity: 0.3; cursor: default; }
+.shelf-caption { display: flex; flex-direction: column; gap: 2px; }
+.shelf-title { font-weight: 600; }
+.shelf-meta { font-size: 13px; color: var(--fg-dim); }
+
+.shelf-empty { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; position: relative; }
+.shelf-slot {
+  height: 132px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.14);
+  display: grid; place-items: start; padding: 16px 20px;
+  font-family: var(--serif); font-size: 56px; line-height: 1; color: rgba(255,255,255,0.12);
+}
+.shelf-empty p {
+  grid-column: 1 / -1; margin: 0; color: var(--fg-dim);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.discography-head { margin-top: 8px; }
+
+/* Pin button on discography tiles */
+.pin-btn {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: rgba(0,0,0,0.6); color: var(--fg); backdrop-filter: blur(8px);
+  opacity: 0; transform: translateZ(40px) scale(0.9); transition: opacity 0.2s, transform 0.2s, background 0.2s;
+}
+.tile:hover .pin-btn, .pin-btn:focus-visible { opacity: 1; transform: translateZ(40px) scale(1); }
+.pin-btn:hover { background: rgba(0,0,0,0.8); }
+.pin-btn.is-pinned { opacity: 1; background: var(--fg); color: var(--bg); transform: translateZ(40px) scale(1); }
+
+@media (max-width: 760px) {
+  .liner { grid-template-columns: 1fr; gap: 12px; }
+  .shelf-grid, .shelf-empty { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Unsave confirmation */
+.save-artist { position: relative; display: inline-flex; }
+.confirm-pop {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 30; width: 320px;
+  padding: 16px; border-radius: 12px;
+  background: rgba(24,24,27,0.97); border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 24px 60px -16px rgba(0,0,0,0.9); backdrop-filter: blur(16px);
+}
+.confirm-title { margin: 0 0 6px; font-weight: 600; }
+.confirm-body { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: var(--fg-dim); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.btn-danger {
+  padding: 11px 18px; border-radius: 999px; font-weight: 600;
+  background: #ff8a80; color: #2a0b08; transition: background 0.2s;
+}
+.btn-danger:hover { background: #ffa59d; }

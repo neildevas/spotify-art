@@ -67,7 +67,6 @@ export function ArtistsView({ artists, sort, onSort, onOpenArtist, onBrowse }: P
                 >
                   {a.name}
                 </motion.span>
-                <span className="artist-genre">{a.genres?.slice(0, 2).join(', ')}</span>
                 <span className="artist-arrow" aria-hidden>
                   →
                 </span>

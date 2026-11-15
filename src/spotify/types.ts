@@ -41,7 +41,6 @@ export type Artist = {
   id: string;
   name: string;
   images: SpotifyImage[];
-  genres?: string[];
   external_urls: { spotify: string };
 };
 
