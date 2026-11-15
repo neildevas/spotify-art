@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import type { SavedArtist } from '../collection/store';
+import { type SavedArtist, useCollection } from '../collection/store';
 import type { CollectionSort } from './CollectionView';
 import { Segmented } from './Header';
 
@@ -20,7 +20,29 @@ type Props = {
 
 /** Artists saved from their pages — a shortcut back to all their releases. */
 export function ArtistsView({ artists, sort, onSort, onOpenArtist, onBrowse }: Props) {
+  // How many of each artist's records are in your collection
+  const records = useCollection();
+  const ownedBy = new Map<string, number>();
+  records.forEach((r) => r.artists.forEach((x) => ownedBy.set(x.id, (ownedBy.get(x.id) ?? 0) + 1)));
   const sorted = sort === 'artist' ? [...artists].sort((a, b) => a.name.localeCompare(b.name)) : artists; // stored newest-first
+
+  const metaFor = (a: SavedArtist) => {
+    const pins = a.pinned?.length ?? 0;
+    const owned = ownedBy.get(a.id) ?? 0;
+    return (
+      [pins && `${pins} pinned`, owned && `${owned} in collection`].filter(Boolean).join(' · ') ||
+      `Saved ${new Date(a.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
+    );
+  };
+
+  const name = (a: SavedArtist, className: string) => (
+    <motion.span className={className} layoutId={`artist-${a.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
+      {a.name}
+    </motion.span>
+  );
+
+  const photo = (a: SavedArtist) =>
+    a.image ? <img src={a.image} alt="" loading="lazy" draggable={false} /> : <span className="artists-initial">{a.name[0]}</span>;
 
   return (
     <>
@@ -48,27 +70,26 @@ export function ArtistsView({ artists, sort, onSort, onOpenArtist, onBrowse }: P
           </div>
         </motion.div>
       ) : (
-        <ul className="artist-list">
+        // Portrait "sleeves": photo with a number, a thin rule, then the name — always visible
+        <ul className="artists-grid">
           {sorted.map((a, i) => (
             <motion.li
               key={a.id}
-              initial={{ opacity: 0, y: 10 }}
+              layout="position"
+              initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease, delay: Math.min(i, 12) * 0.03 }}
+              transition={{ duration: 0.45, ease, delay: Math.min(i, 15) * 0.03 }}
             >
-              <button className="artist-link-row has-photo" onClick={() => onOpenArtist(a)}>
-                <span className="artist-row-photo" aria-hidden>
-                  {a.image ? <img src={a.image} alt="" loading="lazy" draggable={false} /> : a.name[0]}
+              <button className="artists-card" onClick={() => onOpenArtist(a)}>
+                <span className="artists-photo">
+                  {photo(a)}
+                  <span className="artists-num" aria-hidden>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                 </span>
-                <motion.span
-                  className="artist-index-name"
-                  layoutId={`artist-${a.id}`}
-                  transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-                >
-                  {a.name}
-                </motion.span>
-                <span className="artist-arrow" aria-hidden>
-                  →
+                <span className="artists-label">
+                  {name(a, 'artists-name')}
+                  <span className="artists-meta">{metaFor(a)}</span>
                 </span>
               </button>
             </motion.li>
