@@ -31,7 +31,6 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
   // Songs can be hearted on albums by an artist you've collected.
   const favArtist = useSavedArtist(item.albumId ? item.artists?.[0]?.id : undefined);
   const favIds = new Set((favArtist?.favTracks ?? []).map((t) => t.id));
-  console.log('TRACKS', tracklist);
   useEffect(() => {
     listRef.current?.querySelector('.is-current')?.scrollIntoView({ block: 'nearest' });
   }, [tracklist]);

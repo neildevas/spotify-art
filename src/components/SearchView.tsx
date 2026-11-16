@@ -6,7 +6,7 @@ import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
 import { savedArtists, useCollection, useSavedArtist } from '../collection/store';
-import { LinerNotes, TopShelf } from './LinerNotes';
+import { TopShelf } from './LinerNotes';
 import { SaveArtistButton } from './SaveArtistButton';
 import { FavTracks } from './FavTracks';
 
