@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import type { User } from '../spotify/types';
-import type { LayoutMode } from './LayoutMode';
 
 export type View = 'collection' | 'artists' | 'albums' | 'tracks' | 'search';
 
@@ -9,24 +8,16 @@ type Props = {
   onView: (v: View) => void;
   tileSize: number;
   onTileSize: (n: number) => void;
-  layout: LayoutMode;
-  onLayout: (l: LayoutMode) => void;
   user: User | null;
   onLogout: () => void;
 };
 
 const TABS: { id: View; label: string }[] = [
   { id: 'collection', label: 'Collection' },
-  { id: 'artists', label: 'Artists' },
   { id: 'search', label: 'Search' },
 ];
 
-const LAYOUTS: { id: LayoutMode; label: string; aria: string }[] = [
-  { id: 'grid', label: '▦', aria: 'Grid' },
-  { id: 'single', label: '▢', aria: 'One at a time' },
-];
-
-export function Header({ view, onView, tileSize, onTileSize, layout, onLayout, user, onLogout }: Props) {
+export function Header({ view, onView, tileSize, onTileSize, user, onLogout }: Props) {
   return (
     <header className="header">
       <span className="wordmark wordmark-sm">Sleeve</span>
@@ -34,21 +25,16 @@ export function Header({ view, onView, tileSize, onTileSize, layout, onLayout, u
       <Segmented value={view} options={TABS} onChange={onView} groupId="view" />
 
       <div className="header-right">
-        <div className="layout-toggle" title="Grid or one record at a time">
-          <Segmented small groupId="layout" value={layout} options={LAYOUTS} onChange={onLayout} />
-        </div>
-        {layout === 'grid' && (
-          <label className="density" title="Tile size">
+        <label className="density" title="Size">
             <input
               type="range"
               min={90}
               max={340}
               value={tileSize}
               onChange={(e) => onTileSize(Number(e.target.value))}
-              aria-label="Tile size"
+              aria-label="Size"
             />
           </label>
-        )}
         {user && (
           <button className="avatar" onClick={onLogout} title={`Signed in as ${user.display_name ?? user.id} — sign out`}>
             {user.images[0] ? <img src={user.images[0].url} alt="" /> : (user.display_name ?? '?')[0]}

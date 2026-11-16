@@ -8,7 +8,7 @@ export function CollectButton({ record, isSong }: { record: RecordInfo; isSong?:
   const inCollection = useInCollection(record.id);
   // Right after adding, the cursor is still on the button — don't flip straight to "Remove".
   const [fresh, setFresh] = useState(false);
-  const addLabel = isSong ? 'Add this record' : 'Add to collection';
+  const addLabel = isSong ? 'Add this record' : 'Add record';
 
   return (
     <motion.button

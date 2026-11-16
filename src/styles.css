@@ -325,10 +325,12 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .back { color: var(--fg-dim); font-weight: 500; margin-bottom: 20px; transition: color 0.2s; }
 .back:hover { color: var(--fg); }
 .artist-hero {
-  display: flex; align-items: center; gap: clamp(16px, 3vw, 32px); flex-wrap: wrap;
-  margin-bottom: 32px;
+  display: grid; grid-template-columns: minmax(220px, 520px) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 56px); align-items: end;
+  margin: 4px 0 56px;
 }
-.artist-controls { margin-left: auto; align-self: flex-end; }
+.artist-hero-text { display: flex; flex-direction: column; gap: 16px; padding-bottom: 6px; min-width: 0; }
+.artist-stats { font-size: 13px; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
 
 .search-filters { margin: -12px 0 32px; }
 .search-section { margin-bottom: 44px; }
@@ -593,7 +595,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   .artist-index:has(> li:hover) > li:not(:hover), .artist-list:has(> li:hover) > li:not(:hover) { opacity: 0.4; }
 }
 
-.artist-title { font-size: clamp(48px, 7vw, 96px); }
+.artist-title { font-size: clamp(56px, 9vw, 132px); line-height: 0.9; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .artist-title > span:first-child { display: inline-block; }
 
 /* ---------- Collection shelves ---------- */
@@ -614,19 +616,22 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 
 .artist-photo {
-  width: clamp(120px, 14vw, 200px); aspect-ratio: 1; flex-shrink: 0;
-  border-radius: 8px; overflow: hidden; background: var(--bg-raised);
-  box-shadow: 0 30px 70px -24px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06);
+  width: 100%; aspect-ratio: 4 / 5;
+  border-radius: 6px; overflow: hidden; background: var(--bg-raised);
+  box-shadow: 0 60px 120px -40px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
 }
 .artist-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-.artist-save { margin-top: 18px; }
+.artist-photo-empty { display: grid; place-items: center; font-family: var(--serif); font-size: 120px; color: var(--fg-faint); }
+@media (max-width: 760px) {
+  .artist-hero { grid-template-columns: 1fr; align-items: start; }
+  .artist-photo { max-width: 360px; }
+}
 
 
 /* ---------- Artist appreciation: liner notes + top shelf ---------- */
 .section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .section-head h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 40px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.eyebrow.artist-since { display: block; margin-bottom: 10px; }
+.eyebrow.artist-since { display: block; margin: 0; }
 .artist-save { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .liner-hint { font-size: 13px; color: var(--fg-faint); line-height: 1.6; }
 
@@ -647,7 +652,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .liner-input { caret-color: var(--accent); }
 
 .shelf { margin-bottom: 56px; }
-.shelf-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.shelf-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--tile, 180px) * 1.8), 42vw), 1fr)); gap: 24px; }
 .shelf-item { position: relative; display: flex; flex-direction: column; gap: 12px; cursor: grab; }
 .shelf-item:active { cursor: grabbing; }
 .shelf-art { position: relative; display: block; width: 100%; aspect-ratio: 1; cursor: pointer; }
@@ -676,7 +681,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .shelf-title { font-weight: 600; }
 .shelf-meta { font-size: 13px; color: var(--fg-dim); }
 
-.shelf-empty { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; position: relative; }
+.shelf-empty { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--tile, 180px) * 1.8), 42vw), 1fr)); gap: 24px; position: relative; }
 .shelf-slot {
   height: 132px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.14);
   display: grid; place-items: start; padding: 16px 20px;
@@ -698,6 +703,21 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .tile:hover .pin-btn, .pin-btn:focus-visible { opacity: 1; transform: translateZ(40px) scale(1); }
 .pin-btn:hover { background: rgba(0,0,0,0.8); }
 .pin-btn.is-pinned { opacity: 1; background: var(--fg); color: var(--bg); transform: translateZ(40px) scale(1); }
+
+/* "+ Collect artist" on single-record tiles */
+.collect-artist-btn {
+  position: absolute; left: 10px; top: 10px; z-index: 2; max-width: calc(100% - 20px);
+  padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transform: translateZ(40px) translateY(-4px); transition: opacity 0.2s, transform 0.2s;
+}
+.tile:hover .collect-artist-btn, .collect-artist-btn:focus-visible { opacity: 1; transform: translateZ(40px) translateY(0); }
+
+/* Unified collection: artists first, single records below */
+.collection-shelves { margin: -4px 0 28px; }
+.inline-link { padding: 0; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
   .liner { grid-template-columns: 1fr; gap: 12px; }
@@ -724,7 +744,8 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 /* ---------- Artists tab: portrait sleeves ---------- */
 .artists-grid {
   list-style: none; margin: 0; padding: 0; display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(210px, 42vw), 1fr));
+  /* --tile comes from the header size slider (default 180px → ~210px cards) */
+  grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--tile, 180px) * 1.17), 42vw), 1fr));
   column-gap: clamp(14px, 1.6vw, 22px); row-gap: clamp(24px, 2.6vw, 36px);
 }
 .artists-card { display: flex; flex-direction: column; gap: 14px; width: 100%; text-align: left; color: var(--fg); }
@@ -742,7 +763,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   font-size: 11px; letter-spacing: 0.12em; color: rgba(243,241,236,0.85); text-shadow: 0 1px 8px rgba(0,0,0,0.6);
 }
 .artists-label { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.14); }
-.artists-name { display: inline-block; font-family: var(--serif); font-size: clamp(22px, 2vw, 28px); line-height: 1.02; }
+.artists-name { display: inline-block; font-family: var(--serif); font-size: clamp(18px, calc(var(--tile, 180px) * 0.14), 34px); line-height: 1.02; }
 .artists-meta { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-faint); }
 .artists-card:hover .artists-photo, .artists-card:focus-visible .artists-photo {
   transform: translateY(-6px); box-shadow: 0 44px 80px -30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.08);

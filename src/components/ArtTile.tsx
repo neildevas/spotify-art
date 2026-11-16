@@ -13,9 +13,18 @@ type Props = {
   tileWidth: number;
   pinned?: boolean;
   onTogglePin?: (item: ArtItem) => void;
+  onCollectArtist?: (artist: { id: string; name: string }) => void;
 };
 
-export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth, pinned, onTogglePin }: Props) {
+export const ArtTile = memo(function ArtTile({
+  item,
+  index,
+  onSelect,
+  tileWidth,
+  pinned,
+  onTogglePin,
+  onCollectArtist,
+}: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const { rotateX, rotateY, glare, handlers, reset } = useTilt(9);
@@ -79,6 +88,28 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth,
         {item.rank && <span className="tile-rank">{item.rank}</span>}
         {item.tracks && item.tracks.length > 1 && <span className="tile-count">{item.tracks.length} tracks</span>}
         {showMark && <span className="tile-collected" title="In your collection" aria-label="In your collection" />}
+        {onCollectArtist && item.artists?.[0] && (
+          // A single record can grow into the whole artist
+          <span
+            role="button"
+            tabIndex={0}
+            className="collect-artist-btn"
+            title={`Add ${item.artists[0].name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCollectArtist(item.artists![0]);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                onCollectArtist(item.artists![0]);
+              }
+            }}
+          >
+            + Add artist
+          </span>
+        )}
         {onTogglePin && (
           // span, not button: it sits inside the tile's button
           <span

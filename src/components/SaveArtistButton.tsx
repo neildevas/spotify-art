@@ -30,7 +30,7 @@ export function SaveArtistButton({ artist }: { artist: Artist }) {
         whileTap={{ scale: 0.95 }}
         layout
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        title={isSaved ? 'Remove from your saved artists' : 'Keep this artist in your Artists tab'}
+        title={isSaved ? 'Remove from your collection' : 'Add this artist'}
         aria-expanded={confirming}
       >
         <AnimatePresence mode="popLayout" initial={false}>
@@ -44,11 +44,11 @@ export function SaveArtistButton({ artist }: { artist: Artist }) {
           >
             {isSaved ? (
               <>
-                <span className="when-idle">✓ Saved artist</span>
+                <span className="when-idle">✓ In your collection</span>
                 <span className="when-hover">Remove</span>
               </>
             ) : (
-              <>+ Save artist</>
+              <>+ Add artist</>
             )}
           </motion.span>
         </AnimatePresence>
@@ -117,7 +117,7 @@ function ConfirmUnsave({
       transition={{ type: 'spring', stiffness: 500, damping: 34 }}
     >
       <p id="unsave-title" className="confirm-title">
-        Unsave {name}?
+        Remove {name}?
       </p>
       <p className="confirm-body">
         This deletes {losing.join(' and ')} for this artist. It can’t be undone.
@@ -127,7 +127,7 @@ function ConfirmUnsave({
           Keep artist
         </button>
         <button className="btn-danger" onClick={onConfirm}>
-          Unsave
+          Remove
         </button>
       </div>
     </motion.div>

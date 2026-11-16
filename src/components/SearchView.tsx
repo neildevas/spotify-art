@@ -243,7 +243,13 @@ function LoadMore({ onVisible, loading }: { onVisible: () => void; loading: bool
 function ArtistPhoto({ artist }: { artist: Artist }) {
   const { image } = pickImageSet(artist.images);
   const [loaded, setLoaded] = useState(false);
-  if (!image) return null;
+  if (!image) {
+    return (
+      <div className="artist-photo artist-photo-empty" aria-hidden>
+        {artist.name[0]}
+      </div>
+    );
+  }
   return (
     <motion.div
       key={image}
@@ -296,12 +302,13 @@ function ArtistPage({
         ← {backLabel}
       </motion.button>
 
+      {/* Big portrait on the left; name and actions line up with its bottom edge */}
       <header className="artist-hero">
         <ArtistPhoto artist={artist} />
-        <div>
+        <div className="artist-hero-text">
           {saved && (
             <span className="eyebrow artist-since">
-              Saved artist · since{' '}
+              Collected · since{' '}
               {new Date(saved.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
             </span>
           )}
@@ -309,18 +316,16 @@ function ArtistPage({
             <motion.span layoutId={`artist-${artist.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
               {artist.name}
             </motion.span>
-            <span className="count">
-              {albums.items.length}
-              {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
-            </span>
           </h1>
+          <span className="artist-stats">
+            {albums.items.length}
+            {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
+            {owned ? ` · ${owned} in your collection` : ''}
+          </span>
           <div className="artist-save">
             <SaveArtistButton artist={artist} />
-            {!saved && <span className="liner-hint">Save to write liner notes and pin your favourite records.</span>}
+            {!saved && <span className="liner-hint">Add them to pin your favourite records to a top shelf.</span>}
           </div>
-        </div>
-        <div className="artist-controls">
-          <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
         </div>
       </header>
 
@@ -328,16 +333,16 @@ function ArtistPage({
         <>
           {/*<LinerNotes artist={saved} />*/}
           <TopShelf artist={saved} onSelect={onSelect} />
-          <div className="section-head discography-head">
-            <h2>
-              Discography{' '}
-              <span className="count">
-                {owned ? `${owned} in your collection · ` : ''}pin records to your top shelf
-              </span>
-            </h2>
-          </div>
         </>
       )}
+
+      {/* The release filter sits with the grid it controls */}
+      <div className="section-head discography-head">
+        <h2>
+          Discography {saved && <span className="count">pin records to your top shelf</span>}
+        </h2>
+        <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
+      </div>
 
       {albums.error && <p className="error">Couldn’t load releases: {albums.error.message}</p>}
 

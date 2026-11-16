@@ -17,6 +17,9 @@ type Props = {
   /** Artist pages: album ids on the top shelf, and a handler that turns on each tile's pin button. */
   pinnedIds?: Set<string>;
   onTogglePin?: (item: ArtItem) => void;
+  /** Collection page: offer "+ Collect artist" on records whose artist isn't collected yet. */
+  collectedArtistIds?: Set<string>;
+  onCollectArtist?: (artist: { id: string; name: string }) => void;
 };
 
 export function ArtGrid({
@@ -29,6 +32,8 @@ export function ArtGrid({
   allowSingle = true,
   pinnedIds,
   onTogglePin,
+  collectedArtistIds,
+  onCollectArtist,
 }: Props) {
   const { mode } = useLayoutMode();
   if (mode === 'single' && allowSingle) return <SingleView items={items} loading={loading} onSelect={onSelect} />;
@@ -60,6 +65,9 @@ export function ArtGrid({
           tileWidth={tileWidth}
           pinned={!!item.albumId && !!pinnedIds?.has(item.albumId)}
           onTogglePin={onTogglePin}
+          onCollectArtist={
+            onCollectArtist && item.artists?.[0] && !collectedArtistIds?.has(item.artists[0].id) ? onCollectArtist : undefined
+          }
         />
       ))}
     </ul>
