@@ -1,4 +1,4 @@
-**Note**: If you'd like to access this app, please send me an email. Spotify only allows 5 users per app. 
+**Note**: If you'd like to access this app, please send me an email. Spotify only allows five users per app. 
 # Sleeve
 
 A Spotify library viewer where album artwork is the whole point. Saved albums and top tracks show up as a wall of sleeves, with tilt, spotlight-on-hover, and a shared-element zoom into a detail view.
