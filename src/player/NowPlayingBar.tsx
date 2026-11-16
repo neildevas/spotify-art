@@ -20,7 +20,7 @@ function useLivePosition(position: number, measuredAt: number, paused: boolean, 
 }
 
 /** Floating player bar; appears once something has played and stays across tabs. */
-export function NowPlayingBar() {
+export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
   const { nowPlaying, error, dismissError, toggle, next, previous, seek, volume, setVolume, status } = usePlayer();
 
   return (
@@ -62,6 +62,9 @@ export function NowPlayingBar() {
                 onSeek={seek}
                 volume={volume}
                 onVolume={setVolume}
+                onOpen={
+                  onOpenAlbum && nowPlaying.albumId ? () => onOpenAlbum(nowPlaying.albumId!, nowPlaying.trackId) : undefined
+                }
               />
             ) : (
               <span className="np-connecting">Connecting to Spotify…</span>
@@ -81,6 +84,7 @@ function Bar({
   onSeek,
   volume,
   onVolume,
+  onOpen,
 }: {
   np: NonNullable<ReturnType<typeof usePlayer>['nowPlaying']>;
   onToggle: () => void;
@@ -89,6 +93,8 @@ function Bar({
   onSeek: (ms: number) => void;
   volume: number;
   onVolume: (v: number) => void;
+  /** Open the playing album's detail view. */
+  onOpen?: () => void;
 }) {
   const pos = useLivePosition(np.position, np.measuredAt, np.paused, np.duration);
   const pct = np.duration ? (pos / np.duration) * 100 : 0;
@@ -98,8 +104,10 @@ function Bar({
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.img
           key={np.image}
-          className="np-art"
+          className={`np-art${onOpen ? ' np-link' : ''}`}
           src={np.image}
+          onClick={onOpen}
+          title={onOpen ? `Open ${np.albumName}` : undefined}
           alt=""
           initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
@@ -107,7 +115,13 @@ function Bar({
         />
       </AnimatePresence>
       <div className="np-text">
-        <span className="np-title">{np.trackName}</span>
+        {onOpen ? (
+          <button className="np-title np-link" onClick={onOpen} title={`Open ${np.albumName}`}>
+            {np.trackName}
+          </button>
+        ) : (
+          <span className="np-title">{np.trackName}</span>
+        )}
         <span className="np-sub">
           {np.artists} · {np.albumName}
         </span>

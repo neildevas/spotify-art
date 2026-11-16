@@ -41,7 +41,6 @@ export type Artist = {
   id: string;
   name: string;
   images: SpotifyImage[];
-  genres?: string[];
   external_urls: { spotify: string };
 };
 
@@ -92,3 +91,15 @@ export type RecordInfo = {
 export type CollectedRecord = RecordInfo & { addedAt: number };
 
 export type TrackEntry = { rank: number; title: string; duration: string; url: string; id?: string };
+
+/** A song you hearted on a collected artist's page, with enough of its album to show and play it. */
+export type FavTrack = {
+  id: string;
+  title: string;
+  duration: string;
+  url: string;
+  albumId: string;
+  albumName: string;
+  image?: string;
+  thumb?: string;
+};

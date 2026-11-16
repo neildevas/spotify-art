@@ -4,6 +4,7 @@ import { useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
 import { PlayButton } from '../player/PlayButton';
 import type { ArtItem } from '../spotify/types';
+import { isPlayable } from '../spotify/api';
 
 type Props = {
   item: ArtItem;
@@ -11,9 +12,20 @@ type Props = {
   onSelect: (item: ArtItem) => void;
   /** Approximate rendered width in CSS px, used to choose between the 300px and 640px covers. */
   tileWidth: number;
+  pinned?: boolean;
+  onTogglePin?: (item: ArtItem) => void;
+  onCollectArtist?: (artist: { id: string; name: string }) => void;
 };
 
-export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth }: Props) {
+export const ArtTile = memo(function ArtTile({
+  item,
+  index,
+  onSelect,
+  tileWidth,
+  pinned,
+  onTogglePin,
+  onCollectArtist,
+}: Props) {
   const [loaded, setLoaded] = useState(false);
 
   const { rotateX, rotateY, glare, handlers, reset } = useTilt(9);
@@ -28,7 +40,7 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth 
 
   return (
     <motion.li
-      className={`tile${featured ? ' tile-featured' : ''}${item.key.startsWith('record-') ? ' tile-playable' : ''}`}
+      className={`tile${featured ? ' tile-featured' : ''}${isPlayable(item) ? ' tile-playable' : ''}`}
       layout="position"
       initial={{ opacity: 0, y: 18, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -77,8 +89,53 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth 
         {item.rank && <span className="tile-rank">{item.rank}</span>}
         {item.tracks && item.tracks.length > 1 && <span className="tile-count">{item.tracks.length} tracks</span>}
         {showMark && <span className="tile-collected" title="In your collection" aria-label="In your collection" />}
+        {onCollectArtist && item.artists?.[0] && (
+          // A single record can grow into the whole artist
+          <span
+            role="button"
+            tabIndex={0}
+            className="collect-artist-btn"
+            title={`Add ${item.artists[0].name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCollectArtist(item.artists![0]);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                onCollectArtist(item.artists![0]);
+              }
+            }}
+          >
+            + Add artist
+          </span>
+        )}
+        {onTogglePin && (
+          // span, not button: it sits inside the tile's button
+          <span
+            role="button"
+            tabIndex={0}
+            className={`pin-btn ${pinned ? 'is-pinned' : ''}`}
+            title={pinned ? 'Take off the top shelf' : 'Pin to the top shelf'}
+            aria-label={pinned ? 'Unpin' : 'Pin to top shelf'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTogglePin(item);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                onTogglePin(item);
+              }
+            }}
+          >
+            <PinIcon />
+          </span>
+        )}
         {/* Playback starts in the Collection tab */}
-        {item.key.startsWith('record-') && item.albumId && <PlayButton albumId={item.albumId} />}
+        {isPlayable(item) && <PlayButton albumId={item.albumId!} />}
 
         <span className="tile-caption">
           <span className="tile-title">{item.title}</span>
@@ -88,3 +145,12 @@ export const ArtTile = memo(function ArtTile({ item, index, onSelect, tileWidth 
     </motion.li>
   );
 });
+
+export function PinIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
+    </svg>
+  );
+}

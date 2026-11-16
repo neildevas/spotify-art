@@ -1,9 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import type { SearchFilter } from '../hooks/useLibrary';
+import { pickImageSet } from '../spotify/api';
 import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
+import { savedArtists, useCollection, useSavedArtist } from '../collection/store';
+import { TopShelf } from './LinerNotes';
+import { SaveArtistButton } from './SaveArtistButton';
+import { FavTracks } from './FavTracks';
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -20,6 +25,14 @@ const FILTERS: { id: SearchFilter; label: string }[] = [
   { id: 'track', label: 'Songs' },
 ];
 
+// Short enough to fit the big serif field at any width; the filter below says what's being searched.
+const PLACEHOLDERS: Record<SearchFilter, string> = {
+  all: 'Find something',
+  artist: 'Find an artist',
+  album: 'Find an album',
+  track: 'Find a song',
+};
+
 type Props = {
   query: string;
   onQuery: (q: string) => void;
@@ -35,6 +48,8 @@ type Props = {
   albums: { items: ArtItem[]; loading: boolean; error: Error | null; hasMore: boolean; loadMore: () => void };
   tileSize: number;
   onSelect: (item: ArtItem) => void;
+  /** Where the artist page's back link goes ("Search" or "Collection"). */
+  backLabel?: string;
 };
 
 export function SearchView(props: Props) {
@@ -67,7 +82,7 @@ function SearchResults({
           ref={input}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          placeholder="Search artists, albums, songs"
+          placeholder={PLACEHOLDERS[filter]}
           spellCheck={false}
           aria-label="Search"
         />
@@ -110,7 +125,6 @@ function SearchResults({
                     >
                       {a.name}
                     </motion.span>
-                    {filter !== 'all' && <span className="artist-genre">{a.genres?.slice(0, 2).join(', ')}</span>}
                     <span className="artist-arrow" aria-hidden>
                       →
                     </span>
@@ -226,11 +240,52 @@ function LoadMore({ onVisible, loading }: { onVisible: () => void; loading: bool
   );
 }
 
-function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSelect }: Props & { artist: Artist }) {
+/** The artist's photo, only on their own page. Fades in once loaded; nothing shows if Spotify has none. */
+function ArtistPhoto({ artist }: { artist: Artist }) {
+  const { image } = pickImageSet(artist.images);
+  const [loaded, setLoaded] = useState(false);
+  if (!image) {
+    return (
+      <div className="artist-photo artist-photo-empty" aria-hidden>
+        {artist.name[0]}
+      </div>
+    );
+  }
+  return (
+    <motion.div
+      key={image}
+      className="artist-photo"
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: loaded ? 1 : 0, scale: loaded ? 1 : 0.94 }}
+      transition={{ duration: 0.6, ease }}
+    >
+      <img src={image} alt={artist.name} draggable={false} onLoad={() => setLoaded(true)} />
+    </motion.div>
+  );
+}
+
+function ArtistPage({
+  artist,
+  onArtist,
+  group,
+  onGroup,
+  albums,
+  tileSize,
+  onSelect,
+  backLabel = 'Search',
+}: Props & { artist: Artist }) {
+  // Saved artists get the appreciation page: liner notes, a top shelf and pinnable releases.
+  const saved = useSavedArtist(artist.id);
+  const records = useCollection();
+  const owned = records.filter((r) => r.artists.some((a) => a.id === artist.id)).length;
+  const pinnedIds = new Set((saved?.pinned ?? []).map((r) => r.id));
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Only step back to results when no album overlay is open (it handles its own Escape).
-      if (e.key === 'Escape' && !document.querySelector('.overlay')) onArtist(null);
+      // Only step back to results when no album overlay is open (it handles its own Escape),
+      // and not while typing liner notes.
+      const typing = document.activeElement instanceof HTMLTextAreaElement;
+      if (e.key === 'Escape' && !typing && !document.querySelector('.overlay')) onArtist(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -245,42 +300,63 @@ function ArtistPage({ artist, onArtist, group, onGroup, albums, tileSize, onSele
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
       >
-        ← Search
+        ← {backLabel}
       </motion.button>
 
+      {/* Big portrait on the left; name and actions line up with its bottom edge */}
       <header className="artist-hero">
-        <div>
+        <ArtistPhoto artist={artist} />
+        <div className="artist-hero-text">
+          {saved && (
+            <span className="eyebrow artist-since">
+              Collected · since{' '}
+              {new Date(saved.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+            </span>
+          )}
           <h1 className="view-title artist-title">
             <motion.span layoutId={`artist-${artist.id}`} transition={{ type: 'spring', stiffness: 300, damping: 32 }}>
               {artist.name}
             </motion.span>
-            <span className="count">
-              {albums.items.length}
-              {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
-            </span>
           </h1>
-          {!!artist.genres?.length && (
-            <motion.ul
-              className="overlay-meta artist-genres"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease, delay: 0.15 }}
-            >
-              {artist.genres.slice(0, 4).map((g) => (
-                <li key={g}>{g}</li>
-              ))}
-            </motion.ul>
-          )}
-        </div>
-        <div className="artist-controls">
-          <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
+          <span className="artist-stats">
+            {albums.items.length}
+            {albums.hasMore || (albums.loading && albums.items.length) ? '+' : ''} releases
+            {owned ? ` · ${owned} in your collection` : ''}
+          </span>
+          <div className="artist-save">
+            <SaveArtistButton artist={artist} />
+            {!saved && <span className="liner-hint">Add them to pin your favourite records to a top shelf.</span>}
+          </div>
+          {saved && <FavTracks artist={saved} />}
         </div>
       </header>
+
+      {saved && (
+        <>
+          {/*<LinerNotes artist={saved} />*/}
+          <TopShelf artist={saved} onSelect={onSelect} />
+        </>
+      )}
+
+      {/* The release filter sits with the grid it controls */}
+      <div className="section-head discography-head">
+        <h2>
+          Discography {saved && <span className="count">pin records to your top shelf</span>}
+        </h2>
+        <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
+      </div>
 
       {albums.error && <p className="error">Couldn’t load releases: {albums.error.message}</p>}
 
       <motion.div key={`${artist.id}-${group}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <ArtGrid items={albums.items} loading={albums.loading} tileSize={tileSize} onSelect={onSelect} />
+        <ArtGrid
+          items={albums.items}
+          loading={albums.loading}
+          tileSize={tileSize}
+          onSelect={onSelect}
+          pinnedIds={saved ? pinnedIds : undefined}
+          onTogglePin={saved ? (item) => item.record && savedArtists.togglePin(saved.id, item.record) : undefined}
+        />
       </motion.div>
 
       {albums.hasMore && (

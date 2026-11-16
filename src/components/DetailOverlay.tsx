@@ -4,9 +4,11 @@ import { useAlbumTracks } from '../hooks/useAlbumTracks';
 import { PlayButton } from '../player/PlayButton';
 import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
+import { savedArtists, useSavedArtist } from '../collection/store';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
 import type { ArtItem } from '../spotify/types';
+import { isPlayable } from '../spotify/api';
 
 type Props = {
   item: ArtItem;
@@ -25,8 +27,10 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
   const listRef = useRef<HTMLOListElement>(null);
   const player = usePlayer();
   // Playback is enabled for records in the Collection tab.
-  const playable = item.key.startsWith('record-') && !!item.albumId && !player.needsReconnect;
-
+  const playable = isPlayable(item) && !player.needsReconnect;
+  // Songs can be hearted on albums by an artist you've collected.
+  const favArtist = useSavedArtist(item.albumId ? item.artists?.[0]?.id : undefined);
+  const favIds = new Set((favArtist?.favTracks ?? []).map((t) => t.id));
   useEffect(() => {
     listRef.current?.querySelector('.is-current')?.scrollIntoView({ block: 'nearest' });
   }, [tracklist]);
@@ -155,12 +159,35 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
                       </a>
                     )}
                     <span className="tl-dur">{t.duration}</span>
+                    {favArtist && t.id && (
+                      <button
+                        className={`tl-fav ${favIds.has(t.id) ? 'is-fav' : ''}`}
+                        aria-pressed={favIds.has(t.id)}
+                        aria-label={favIds.has(t.id) ? `Remove ${t.title} from favourites` : `Favourite ${t.title}`}
+                        title={favIds.has(t.id) ? 'Remove from favourite tracks' : `Favourite (shows on ${favArtist.name}’s page)`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          savedArtists.toggleFav(favArtist.id, {
+                            id: t.id!,
+                            title: t.title,
+                            duration: t.duration,
+                            url: t.url,
+                            albumId: item.albumId!,
+                            albumName: item.title,
+                            image: item.image,
+                            thumb: item.thumb,
+                          });
+                        }}
+                      >
+                        <HeartIcon filled={favIds.has(t.id)} />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ol>
             ) : null,
             <div className="overlay-actions" key="l">
-              {item.key.startsWith('record-') && item.albumId && <PlayButton albumId={item.albumId} variant="large" />}
+              {isPlayable(item) && <PlayButton albumId={item.albumId!} variant="large" />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗
@@ -187,5 +214,19 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
       </button>
       <div className="overlay-hint">← → to browse · esc to close</div>
     </motion.div>
+  );
+}
+
+export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 6.9 4.5c2.1 0 3.6 1.2 5.1 3 1.5-1.8 3-3 5.1-3 3.5 0 5.5 3.5 4.2 6.8-1.8 4.6-9.3 9.2-9.3 9.2z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
