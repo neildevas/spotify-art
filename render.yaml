@@ -1,0 +1,21 @@
+# Render Blueprint: deploys Sleeve as a free static site.
+# In Render: New → Blueprint → pick this repo. It will ask for the two env vars below.
+services:
+  - type: web
+    runtime: static
+    name: sleeve
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    routes:
+      # Single-page app: serve index.html for paths without a file (e.g. Spotify's /callback)
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Both are baked into the build, so redeploy after changing them.
+      - key: VITE_SPOTIFY_CLIENT_ID
+        sync: false
+      # https://<your-site>.onrender.com/callback (also add it under Redirect URIs in the Spotify dashboard)
+      - key: VITE_SPOTIFY_REDIRECT_URI
+        sync: false
