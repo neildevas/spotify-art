@@ -8,6 +8,7 @@ import { Segmented } from './Header';
 import { savedArtists, useCollection, useSavedArtist } from '../collection/store';
 import { LinerNotes, TopShelf } from './LinerNotes';
 import { SaveArtistButton } from './SaveArtistButton';
+import { FavTracks } from './FavTracks';
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -326,6 +327,7 @@ function ArtistPage({
             <SaveArtistButton artist={artist} />
             {!saved && <span className="liner-hint">Add them to pin your favourite records to a top shelf.</span>}
           </div>
+          {saved && <FavTracks artist={saved} />}
         </div>
       </header>
 

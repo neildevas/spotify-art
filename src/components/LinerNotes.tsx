@@ -4,6 +4,7 @@ import { type SavedArtist, savedArtists } from '../collection/store';
 import { pinnedToItem } from '../spotify/api';
 import type { ArtItem, RecordInfo } from '../spotify/types';
 import { PinIcon } from './ArtTile';
+import { PlayButton } from '../player/PlayButton';
 
 /** Your own words about the artist, only on their page. Click to write; saves when you click away. */
 export function LinerNotes({ artist }: { artist: SavedArtist }) {
@@ -147,6 +148,7 @@ export function TopShelf({ artist, onSelect }: { artist: SavedArtist; onSelect: 
                       <img src={r.image} alt="" draggable={false} />
                     </motion.div>
                     <span className="shelf-rank">{i + 1}</span>
+                    <PlayButton albumId={r.id} />
                   </button>
                   <div className="shelf-tools">
                     <button onClick={() => save(move(i, i - 1))} disabled={i === 0} aria-label="Move left">

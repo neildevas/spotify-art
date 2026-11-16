@@ -20,7 +20,9 @@ import {
 import { type SavedArtist, savedArtists, useCollection, useSavedArtists } from './collection/store';
 import { clearCache } from './spotify/cache';
 import {
+  getAlbumItem,
   getArtist,
+  isPlayable,
   pinnedToItem,
   getMe,
   groupTracksByAlbum,
@@ -94,7 +96,6 @@ export default function App() {
   return (
     <PlayerProvider>
       <Wall onSignOut={signOut} />
-      <NowPlayingBar />
     </PlayerProvider>
   );
 }
@@ -226,6 +227,19 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     [items],
   );
   const close = useCallback(() => setSelected(null), []);
+
+  /** Clicking the player's cover or title opens the album that's playing, on the song that's playing. */
+  const openPlayingAlbum = useCallback(
+    (albumId: string, trackId: string | null) => {
+      const onPage = items.find((x) => x.albumId === albumId && isPlayable(x));
+      const show = (item: ArtItem) => setSelected({ ...item, highlightTrackId: trackId ?? undefined });
+      if (onPage) return show(onPage);
+      getAlbumItem(albumId)
+        .then(show)
+        .catch(() => {});
+    },
+    [items],
+  );
   // The one-at-a-time view is retired; everything is a grid sized by the slider.
   const layoutState = useMemo(() => ({ mode: 'grid' as const, selectedKey: selected?.key ?? null }), [selected]);
 
@@ -336,6 +350,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         <AnimatePresence>
           {selected && <DetailOverlay key="overlay" item={selected} onClose={close} onStep={step} onArtist={openArtist} />}
         </AnimatePresence>
+        <NowPlayingBar onOpenAlbum={openPlayingAlbum} />
       </LayoutGroup>
     </LayoutModeContext.Provider>
   );

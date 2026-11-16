@@ -157,6 +157,13 @@ export const playAlbum = (deviceId: string, albumId: string, position = 0) =>
     body: { context_uri: `spotify:album:${albumId}`, offset: { position } },
   });
 
+/** Play a list of songs (e.g. an artist's favourites) in order, starting at `position`. */
+export const playTracks = (deviceId: string, trackIds: string[], position = 0) =>
+  spotify<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+    method: 'PUT',
+    body: { uris: trackIds.map((id) => `spotify:track:${id}`), offset: { position } },
+  });
+
 export const savedAlbumsHead = () => spotify<Paging<SavedAlbum>>('/me/albums?limit=1');
 
 /** Yields saved albums page by page (50 at a time) so the grid can fill in progressively. */
@@ -295,6 +302,10 @@ export function artistAlbumToItem(album: Album): ArtItem {
   };
 }
 
+/** One album as a playable overlay item (e.g. whatever the player is on). Shares the tracklist's cached request. */
+export const getAlbumItem = (id: string): Promise<ArtItem> =>
+  get<Album>(`/albums/${id}`, HOUR).then(artistAlbumToItem);
+
 export const searchAlbumToItem = (album: Album): ArtItem => ({
   ...artistAlbumToItem(album),
   key: `search-album-${album.id}`,
@@ -385,6 +396,10 @@ export function recordToItem(r: CollectedRecord): ArtItem {
     record: r,
   };
 }
+
+/** Albums you can play from Sleeve: your records, an artist's discography and their top shelf. */
+export const isPlayable = (item: ArtItem) =>
+  !!item.albumId && /^(record|artistalbum|pinned)-/.test(item.key);
 
 /** A record on an artist's top shelf, as a tile/overlay item. */
 export function pinnedToItem(r: RecordInfo, rank: number): ArtItem {

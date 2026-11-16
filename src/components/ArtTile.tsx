@@ -4,6 +4,7 @@ import { useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
 import { PlayButton } from '../player/PlayButton';
 import type { ArtItem } from '../spotify/types';
+import { isPlayable } from '../spotify/api';
 
 type Props = {
   item: ArtItem;
@@ -39,7 +40,7 @@ export const ArtTile = memo(function ArtTile({
 
   return (
     <motion.li
-      className={`tile${featured ? ' tile-featured' : ''}${item.key.startsWith('record-') ? ' tile-playable' : ''}`}
+      className={`tile${featured ? ' tile-featured' : ''}${isPlayable(item) ? ' tile-playable' : ''}`}
       layout="position"
       initial={{ opacity: 0, y: 18, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -134,7 +135,7 @@ export const ArtTile = memo(function ArtTile({
           </span>
         )}
         {/* Playback starts in the Collection tab */}
-        {item.key.startsWith('record-') && item.albumId && <PlayButton albumId={item.albumId} />}
+        {isPlayable(item) && <PlayButton albumId={item.albumId!} />}
 
         <span className="tile-caption">
           <span className="tile-title">{item.title}</span>

@@ -488,6 +488,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
 }
 .tile:hover .play-btn-tile, .play-btn-tile.is-current, .play-btn-tile:focus-visible { opacity: 1; transform: translateY(0) translateZ(40px); }
+.shelf-item:hover .play-btn-tile { opacity: 1; transform: translateY(0) translateZ(40px); }
 .tile-playable .tile-caption { padding-right: 58px; } /* keep titles clear of the play button */
 .play-btn-large {
   height: 44px; padding: 0 22px 0 18px; border-radius: 999px;
@@ -525,6 +526,11 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .np-text { display: flex; flex-direction: column; min-width: 0; }
 .np-title, .np-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-title { font-weight: 600; }
+.np-link { cursor: pointer; }
+button.np-title { text-align: left; padding: 0; max-width: 100%; }
+button.np-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+img.np-link { transition: transform 0.2s; }
+img.np-link:hover { transform: scale(1.06); }
 .np-sub { font-size: 12px; color: var(--fg-dim); }
 .np-controls { display: flex; align-items: center; gap: 6px; }
 .np-btn { width: 34px; height: 34px; border-radius: 50%; font-size: 13px; color: var(--fg-dim); transition: color 0.2s, background 0.2s; }
@@ -774,3 +780,36 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   .artists-grid > li { transition: opacity 0.35s var(--ease), filter 0.35s var(--ease); }
   .artists-grid:has(> li:hover) > li:not(:hover) { opacity: 0.6; filter: saturate(0.75); }
 }
+
+/* Heart a song in an album's track list (collected artists only) */
+.tracklist li:has(.tl-fav) { grid-template-columns: 2.2em 1fr auto 26px; }
+.tl-fav, .fav-heart {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  color: var(--fg-faint); opacity: 0; transition: opacity 0.15s, color 0.15s, transform 0.15s; align-self: center;
+}
+.tracklist li:hover .tl-fav, .tl-fav:focus-visible, .tl-fav.is-fav { opacity: 1; }
+.tl-fav:hover { color: var(--fg); transform: scale(1.12); }
+.tl-fav.is-fav, .fav-heart { color: var(--accent); }
+.fav-heart { opacity: 1; }
+.fav-heart:hover { transform: scale(1.12); }
+
+/* Favourite tracks — a setlist in the hero */
+.fav-setlist { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.14); max-width: 640px; }
+.fav-setlist-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.fav-setlist-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fav-setlist-list { list-style: none; margin: 0; padding: 0; }
+.fav-setlist-list li {
+  display: grid; grid-template-columns: 26px 36px minmax(0, 1fr) auto 26px; align-items: center; gap: 14px;
+  padding: 7px 6px; margin: 0 -6px; border-radius: 6px; border-bottom: 1px solid var(--line); cursor: pointer;
+  transition: background 0.15s;
+}
+.fav-setlist-list li:hover { background: rgba(255,255,255,0.05); }
+.fav-num { font-size: 12px; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.fav-thumb { width: 36px; height: 36px; border-radius: 3px; object-fit: cover; background: rgba(255,255,255,0.06); }
+.fav-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fav-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav-album { font-size: 12px; color: var(--fg-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav-dur { font-size: 12px; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
+.fav-setlist-list li.is-playing .fav-title { color: var(--accent); }
+
+.fav-setlist-head .eyebrow { margin: 0; }

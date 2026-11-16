@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { Artist, CollectedRecord, RecordInfo } from '../spotify/types';
+import type { Artist, CollectedRecord, FavTrack, RecordInfo } from '../spotify/types';
 
 /**
  * The user's own record collection. Lives in this browser's localStorage, never on Spotify.
@@ -21,6 +21,8 @@ export type SavedArtist = {
   note?: string;
   /** Records on the artist's top shelf, in your order (first = No. 1). */
   pinned?: RecordInfo[];
+  /** Songs you hearted from their albums, in the order you added them. */
+  favTracks?: FavTrack[];
 };
 
 const ARTISTS_KEY = 'sleeve.artists.v1';
@@ -143,7 +145,7 @@ export const savedArtists = {
     if (cur.name === a.name && cur.image === image) return;
     commitArtists(artists.map((x) => (x.id === a.id ? { ...x, name: a.name, image } : x)));
   },
-  update(id: string, patch: Partial<Pick<SavedArtist, 'note' | 'pinned'>>) {
+  update(id: string, patch: Partial<Pick<SavedArtist, 'note' | 'pinned' | 'favTracks'>>) {
     commitArtists(artists.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   },
   togglePin(id: string, record: RecordInfo) {
@@ -152,6 +154,14 @@ export const savedArtists = {
     const pinned = a.pinned ?? [];
     this.update(id, {
       pinned: pinned.some((r) => r.id === record.id) ? pinned.filter((r) => r.id !== record.id) : [...pinned, record],
+    });
+  },
+  toggleFav(id: string, track: FavTrack) {
+    const a = artists.find((x) => x.id === id);
+    if (!a) return;
+    const favs = a.favTracks ?? [];
+    this.update(id, {
+      favTracks: favs.some((t) => t.id === track.id) ? favs.filter((t) => t.id !== track.id) : [...favs, track],
     });
   },
 };
