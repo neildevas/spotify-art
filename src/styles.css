@@ -386,6 +386,9 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   transform: translateZ(30px); pointer-events: none;
 }
 .grid-captions .tile-collected { bottom: auto; top: 8px; }
+/* The play button takes that corner on hover */
+.tile-collected { transition: opacity 0.2s; }
+.tile-playable:hover .tile-collected { opacity: 0; }
 
 .collection-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .text-btn { color: var(--fg-dim); font-size: 13px; font-weight: 500; padding: 6px 4px; transition: color 0.2s; }
@@ -488,7 +491,6 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
   transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
 }
 .tile:hover .play-btn-tile, .play-btn-tile.is-current, .play-btn-tile:focus-visible { opacity: 1; transform: translateY(0) translateZ(40px); }
-.shelf-item:hover .play-btn-tile { opacity: 1; transform: translateY(0) translateZ(40px); }
 .tile-playable .tile-caption { padding-right: 58px; } /* keep titles clear of the play button */
 .play-btn-large {
   height: 44px; padding: 0 22px 0 18px; border-radius: 999px;
@@ -634,7 +636,7 @@ img.np-link:hover { transform: scale(1.06); }
 }
 
 
-/* ---------- Artist appreciation: liner notes + top shelf ---------- */
+/* ---------- Artist page: liner notes ---------- */
 .section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .section-head h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 40px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .eyebrow.artist-since { display: block; margin: 0; }
@@ -657,58 +659,20 @@ img.np-link:hover { transform: scale(1.06); }
 .liner-input::placeholder { color: #55534f; }
 .liner-input { caret-color: var(--accent); }
 
-.shelf { margin-bottom: 56px; }
-.shelf-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--tile, 180px) * 1.8), 42vw), 1fr)); gap: 24px; }
-.shelf-item { position: relative; display: flex; flex-direction: column; gap: 12px; cursor: grab; }
-.shelf-item:active { cursor: grabbing; }
-.shelf-art { position: relative; display: block; width: 100%; aspect-ratio: 1; cursor: pointer; }
-.shelf-cover {
-  position: absolute; inset: 0; border-radius: 8px; overflow: hidden; background: var(--bg-raised);
-  box-shadow: 0 40px 80px -30px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05);
-  transition: transform 0.35s var(--ease);
-}
-.shelf-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.shelf-art:hover .shelf-cover { transform: translateY(-4px); }
-.shelf-rank {
-  position: absolute; top: 14px; left: 18px; pointer-events: none;
-  font-family: var(--serif); font-size: clamp(40px, 4.4vw, 64px); line-height: 1; color: #fff;
-  text-shadow: 0 2px 22px rgba(0,0,0,0.55);
-}
-.shelf-tools {
-  position: absolute; top: 12px; right: 12px; display: flex; gap: 2px; padding: 3px;
-  border-radius: 8px; background: rgba(18,18,20,0.9); border: 1px solid rgba(255,255,255,0.12);
-  opacity: 0; transform: translateY(-4px); transition: opacity 0.2s, transform 0.2s;
-}
-.shelf-item:hover .shelf-tools, .shelf-tools:focus-within { opacity: 1; transform: none; }
-.shelf-tools button { padding: 5px 9px; border-radius: 5px; font-size: 12px; color: var(--fg-dim); }
-.shelf-tools button:hover:not(:disabled) { color: var(--fg); background: rgba(255,255,255,0.08); }
-.shelf-tools button:disabled { opacity: 0.3; cursor: default; }
-.shelf-caption { display: flex; flex-direction: column; gap: 2px; }
-.shelf-title { font-weight: 600; }
-.shelf-meta { font-size: 13px; color: var(--fg-dim); }
-
-.shelf-empty { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(calc(var(--tile, 180px) * 1.8), 42vw), 1fr)); gap: 24px; position: relative; }
-.shelf-slot {
-  height: 132px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.14);
-  display: grid; place-items: start; padding: 16px 20px;
-  font-family: var(--serif); font-size: 56px; line-height: 1; color: rgba(255,255,255,0.12);
-}
-.shelf-empty p {
-  grid-column: 1 / -1; margin: 0; color: var(--fg-dim);
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-}
 .discography-head { margin-top: 8px; }
 
-/* Pin button on discography tiles */
-.pin-btn {
+/* + / ✓ add-to-collection on discography tiles */
+.add-btn {
   position: absolute; top: 10px; left: 10px; z-index: 2;
   width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-  background: rgba(0,0,0,0.6); color: var(--fg); backdrop-filter: blur(8px);
-  opacity: 0; transform: translateZ(40px) scale(0.9); transition: opacity 0.2s, transform 0.2s, background 0.2s;
+  background: rgba(0,0,0,0.6); color: var(--fg); backdrop-filter: blur(8px); font-size: 16px; font-weight: 600; line-height: 1;
+  opacity: 0; transform: translateZ(40px) scale(0.9); transition: opacity 0.2s, transform 0.2s, background 0.2s, color 0.2s;
 }
-.tile:hover .pin-btn, .pin-btn:focus-visible { opacity: 1; transform: translateZ(40px) scale(1); }
-.pin-btn:hover { background: rgba(0,0,0,0.8); }
-.pin-btn.is-pinned { opacity: 1; background: var(--fg); color: var(--bg); transform: translateZ(40px) scale(1); }
+.tile:hover .add-btn, .add-btn:focus-visible { opacity: 1; transform: translateZ(40px) scale(1); }
+.add-btn:hover { background: rgba(0,0,0,0.85); }
+.add-btn.is-in { background: var(--fg); color: var(--bg); }
+.your-records { margin-bottom: 48px; }
+.your-records > .liner-hint { margin: 0; }
 
 /* "+ Collect artist" on single-record tiles */
 .collect-artist-btn {
@@ -735,7 +699,6 @@ img.np-link:hover { transform: scale(1.06); }
 
 @media (max-width: 760px) {
   .liner { grid-template-columns: 1fr; gap: 12px; }
-  .shelf-grid, .shelf-empty { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Unsave confirmation */

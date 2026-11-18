@@ -14,9 +14,8 @@ type Props = {
   skeletons?: number;
   /** Set false where one-at-a-time doesn't make sense (e.g. the mixed "All" search sections). */
   allowSingle?: boolean;
-  /** Artist pages: album ids on the top shelf, and a handler that turns on each tile's pin button. */
-  pinnedIds?: Set<string>;
-  onTogglePin?: (item: ArtItem) => void;
+  /** Artist discography: a quick + / ✓ on each tile to add the record to (or take it out of) your collection. */
+  collectToggle?: boolean;
   /** Collection page: offer "+ Collect artist" on records whose artist isn't collected yet. */
   collectedArtistIds?: Set<string>;
   onCollectArtist?: (artist: { id: string; name: string }) => void;
@@ -30,8 +29,7 @@ export function ArtGrid({
   captions,
   skeletons = 24,
   allowSingle = true,
-  pinnedIds,
-  onTogglePin,
+  collectToggle,
   collectedArtistIds,
   onCollectArtist,
 }: Props) {
@@ -63,8 +61,7 @@ export function ArtGrid({
           index={i}
           onSelect={onSelect}
           tileWidth={tileWidth}
-          pinned={!!item.albumId && !!pinnedIds?.has(item.albumId)}
-          onTogglePin={onTogglePin}
+          collectToggle={collectToggle}
           onCollectArtist={
             onCollectArtist && item.artists?.[0] && !collectedArtistIds?.has(item.artists[0].id) ? onCollectArtist : undefined
           }

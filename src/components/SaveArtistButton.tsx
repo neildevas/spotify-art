@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { savedArtists, useSavedArtist } from '../collection/store';
 import type { Artist } from '../spotify/types';
 
-/** Save / unsave an artist page. Unsaving asks first when there are liner notes or pins to lose. */
+/** Save / unsave an artist page. Unsaving asks first when there are liner notes to lose. */
 export function SaveArtistButton({ artist }: { artist: Artist }) {
   const saved = useSavedArtist(artist.id);
   const isSaved = !!saved;
@@ -11,9 +11,8 @@ export function SaveArtistButton({ artist }: { artist: Artist }) {
   const [fresh, setFresh] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const pins = saved?.pinned?.length ?? 0;
   const hasNote = !!saved?.note;
-  const wouldLose = [hasNote && 'your liner notes', pins > 0 && `your top shelf (${pins} pinned)`].filter(Boolean);
+  const wouldLose = [hasNote && 'your liner notes'].filter(Boolean);
 
   const onClick = () => {
     if (isSaved && wouldLose.length) return setConfirming(true);

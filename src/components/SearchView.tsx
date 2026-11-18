@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import type { SearchFilter } from '../hooks/useLibrary';
-import { pickImageSet } from '../spotify/api';
+import { artistRecordItems, pickImageSet } from '../spotify/api';
 import type { AlbumGroup, Artist, ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { Segmented } from './Header';
-import { savedArtists, useCollection, useSavedArtist } from '../collection/store';
-import { TopShelf } from './LinerNotes';
+import { useCollection, useSavedArtist } from '../collection/store';
 import { SaveArtistButton } from './SaveArtistButton';
 import { FavTracks } from './FavTracks';
 
@@ -274,11 +273,11 @@ function ArtistPage({
   onSelect,
   backLabel = 'Search',
 }: Props & { artist: Artist }) {
-  // Saved artists get the appreciation page: liner notes, a top shelf and pinnable releases.
+  // Collected artists also get favourite tracks; everyone gets your records by them, then the discography.
   const saved = useSavedArtist(artist.id);
   const records = useCollection();
-  const owned = records.filter((r) => r.artists.some((a) => a.id === artist.id)).length;
-  const pinnedIds = new Set((saved?.pinned ?? []).map((r) => r.id));
+  const yours = artistRecordItems(records, artist.id);
+  const owned = yours.length;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -325,23 +324,33 @@ function ArtistPage({
           </span>
           <div className="artist-save">
             <SaveArtistButton artist={artist} />
-            {!saved && <span className="liner-hint">Add them to pin your favourite records to a top shelf.</span>}
+            {!saved && <span className="liner-hint">Add them to keep their card in your collection and heart favourite tracks.</span>}
           </div>
           {saved && <FavTracks artist={saved} />}
         </div>
       </header>
 
-      {saved && (
-        <>
-          {/*<LinerNotes artist={saved} />*/}
-          <TopShelf artist={saved} onSelect={onSelect} />
-        </>
+      {/*{saved && <LinerNotes artist={saved} />}*/}
+
+      {(saved || owned > 0) && (
+        <section className="your-records">
+          <div className="section-head">
+            <h2>
+              Your records {owned > 0 && <span className="count">{owned} in your collection</span>}
+            </h2>
+          </div>
+          {owned ? (
+            <ArtGrid items={yours} loading={false} tileSize={tileSize} onSelect={onSelect} />
+          ) : (
+            <p className="liner-hint">None of their records in your collection yet. Add some from the discography below.</p>
+          )}
+        </section>
       )}
 
       {/* The release filter sits with the grid it controls */}
       <div className="section-head discography-head">
         <h2>
-          Discography {saved && <span className="count">pin records to your top shelf</span>}
+          Discography <span className="count">+ to add a record to your collection</span>
         </h2>
         <Segmented small groupId="artistGroup" value={group} options={GROUPS} onChange={onGroup} />
       </div>
@@ -354,8 +363,7 @@ function ArtistPage({
           loading={albums.loading}
           tileSize={tileSize}
           onSelect={onSelect}
-          pinnedIds={saved ? pinnedIds : undefined}
-          onTogglePin={saved ? (item) => item.record && savedArtists.togglePin(saved.id, item.record) : undefined}
+          collectToggle
         />
       </motion.div>
 

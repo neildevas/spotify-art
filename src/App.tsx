@@ -23,7 +23,7 @@ import {
   getAlbumItem,
   getArtist,
   isPlayable,
-  pinnedToItem,
+  artistRecordItems,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -134,7 +134,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const artistAlbums = useArtistAlbums(artist?.id ?? null, artistGroup, onSignOut);
   // An artist opened from the Collection shows there, so the header stays on Collection.
   const artistInCollection = view === 'collection' && !!artist && artistOrigin === 'collection';
-  const shelfPins = artist ? artistShelf.find((a) => a.id === artist.id)?.pinned : undefined;
+  // Your records by the open artist come first on their page (and in the overlay's ← → order).
+  const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
 
   // Records and artists are stored newest-first, so "recent" is already in order.
   const collectionItems = useMemo(() => {
@@ -157,10 +158,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const searchSongItems = useMemo(() => search.tracks.map(searchTrackToItem), [search.tracks]);
 
   const items =
-    artist && (artistInCollection || view === 'search') && shelfPins?.length
-      ? [...shelfPins.map((r, i) => pinnedToItem(r, i + 1)), ...artistAlbums.items]
-      : artistInCollection
-      ? artistAlbums.items
+    artist && (artistInCollection || view === 'search')
+      ? [...artistRecords, ...artistAlbums.items]
       : view === 'collection'
       ? collectionItems
       : view === 'tracks'

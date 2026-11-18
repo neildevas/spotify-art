@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { memo, useState } from 'react';
-import { useInCollection } from '../collection/store';
+import { collection, useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
 import { PlayButton } from '../player/PlayButton';
 import type { ArtItem } from '../spotify/types';
@@ -12,8 +12,7 @@ type Props = {
   onSelect: (item: ArtItem) => void;
   /** Approximate rendered width in CSS px, used to choose between the 300px and 640px covers. */
   tileWidth: number;
-  pinned?: boolean;
-  onTogglePin?: (item: ArtItem) => void;
+  collectToggle?: boolean;
   onCollectArtist?: (artist: { id: string; name: string }) => void;
 };
 
@@ -22,8 +21,7 @@ export const ArtTile = memo(function ArtTile({
   index,
   onSelect,
   tileWidth,
-  pinned,
-  onTogglePin,
+  collectToggle,
   onCollectArtist,
 }: Props) {
   const [loaded, setLoaded] = useState(false);
@@ -111,27 +109,28 @@ export const ArtTile = memo(function ArtTile({
             + Add artist
           </span>
         )}
-        {onTogglePin && (
+        {collectToggle && item.record && (
           // span, not button: it sits inside the tile's button
           <span
             role="button"
             tabIndex={0}
-            className={`pin-btn ${pinned ? 'is-pinned' : ''}`}
-            title={pinned ? 'Take off the top shelf' : 'Pin to the top shelf'}
-            aria-label={pinned ? 'Unpin' : 'Pin to top shelf'}
+            className={`add-btn ${collected ? 'is-in' : ''}`}
+            title={collected ? 'Remove from your collection' : 'Add to your collection'}
+            aria-label={collected ? `Remove ${item.title} from your collection` : `Add ${item.title} to your collection`}
+            aria-pressed={collected}
             onClick={(e) => {
               e.stopPropagation();
-              onTogglePin(item);
+              collection.toggle(item.record!);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 e.stopPropagation();
-                onTogglePin(item);
+                collection.toggle(item.record!);
               }
             }}
           >
-            <PinIcon />
+            {collected ? '✓' : '+'}
           </span>
         )}
         {/* Playback starts in the Collection tab */}
@@ -145,12 +144,3 @@ export const ArtTile = memo(function ArtTile({
     </motion.li>
   );
 });
-
-export function PinIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 17v5" />
-      <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
-    </svg>
-  );
-}

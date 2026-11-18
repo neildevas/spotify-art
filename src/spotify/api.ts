@@ -397,23 +397,14 @@ export function recordToItem(r: CollectedRecord): ArtItem {
   };
 }
 
-/** Albums you can play from Sleeve: your records, an artist's discography and their top shelf. */
+/** Albums you can play from Sleeve: your records and an artist's discography. */
 export const isPlayable = (item: ArtItem) =>
-  !!item.albumId && /^(record|artistalbum|pinned)-/.test(item.key);
+  !!item.albumId && /^(record|artistalbum)-/.test(item.key);
 
-/** A record on an artist's top shelf, as a tile/overlay item. */
-export function pinnedToItem(r: RecordInfo, rank: number): ArtItem {
-  return {
-    key: `pinned-${r.id}`,
-    image: r.image,
-    thumb: r.thumb,
-    title: r.name,
-    subtitle: artistNames(r.artists),
-    year: r.year,
-    details: [TYPE_LABEL[r.type], `${r.totalTracks} track${r.totalTracks === 1 ? '' : 's'}`, `Top shelf · No. ${rank}`],
-    url: r.url,
-    albumId: r.id,
-    artists: r.artists,
-    record: r,
-  };
+/** Your collected records by one artist, oldest release first (your slice of their discography). */
+export function artistRecordItems(records: CollectedRecord[], artistId: string): ArtItem[] {
+  return records
+    .filter((r) => r.artists.some((a) => a.id === artistId))
+    .map(recordToItem)
+    .sort((x, y) => x.year.localeCompare(y.year));
 }

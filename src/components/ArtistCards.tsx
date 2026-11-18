@@ -11,12 +11,10 @@ export function ArtistCards({ artists, onOpenArtist }: { artists: SavedArtist[];
   records.forEach((r) => r.artists.forEach((x) => ownedBy.set(x.id, (ownedBy.get(x.id) ?? 0) + 1)));
 
   const metaFor = (a: SavedArtist) => {
-    const pins = a.pinned?.length ?? 0;
     const owned = ownedBy.get(a.id) ?? 0;
-    return (
-      [pins && `${pins} pinned`, owned && `${owned} record${owned === 1 ? '' : 's'}`].filter(Boolean).join(' · ') ||
-      `Since ${new Date(a.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
-    );
+    return owned
+      ? `${owned} record${owned === 1 ? '' : 's'}`
+      : `Since ${new Date(a.addedAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
   };
 
   return (

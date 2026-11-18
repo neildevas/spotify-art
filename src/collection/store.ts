@@ -19,7 +19,7 @@ export type SavedArtist = {
   addedAt: number;
   /** Your liner notes: why this artist matters to you. */
   note?: string;
-  /** Records on the artist's top shelf, in your order (first = No. 1). */
+  /** Retired top shelf. Old pins are moved into the collection on load; nothing reads this otherwise. */
   pinned?: RecordInfo[];
   /** Songs you hearted from their albums, in the order you added them. */
   favTracks?: FavTrack[];
@@ -87,12 +87,8 @@ export const collection = {
     if (records.some((r) => r.id === record.id)) return;
     commit([{ ...record, addedAt: Date.now() }, ...records]);
   },
-  /** Removing a record also takes it off any artist's top shelf — you can only display what you own. */
   remove(id: string) {
     commit(records.filter((r) => r.id !== id));
-    if (artists.some((a) => a.pinned?.some((r) => r.id === id))) {
-      commitArtists(artists.map((a) => (a.pinned?.some((r) => r.id === id) ? { ...a, pinned: a.pinned.filter((r) => r.id !== id) } : a)));
-    }
   },
   toggle(record: RecordInfo) {
     if (records.some((r) => r.id === record.id)) this.remove(record.id);
@@ -153,17 +149,6 @@ export const savedArtists = {
   update(id: string, patch: Partial<Pick<SavedArtist, 'note' | 'pinned' | 'favTracks'>>) {
     commitArtists(artists.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   },
-  /** Pinning puts a record on the top shelf, so it joins your collection too. Unpinning keeps it there. */
-  togglePin(id: string, record: RecordInfo) {
-    const a = artists.find((x) => x.id === id);
-    if (!a) return;
-    const pinned = a.pinned ?? [];
-    const pinning = !pinned.some((r) => r.id === record.id);
-    if (pinning) collection.add(record);
-    this.update(id, {
-      pinned: pinning ? [...pinned, record] : pinned.filter((r) => r.id !== record.id),
-    });
-  },
   toggleFav(id: string, track: FavTrack) {
     const a = artists.find((x) => x.id === id);
     if (!a) return;
@@ -186,7 +171,7 @@ export function useIsArtistSaved(id: string | undefined) {
   return useSyncExternalStore(subscribe, () => (id ? artists.some((a) => a.id === id) : false));
 }
 
-/** Pins made before pins counted as collecting: make sure every pinned record is in the collection. */
+/** The top shelf is retired: make sure every record that was ever pinned is in the collection. */
 function collectPinnedRecords() {
   const have = new Set(records.map((r) => r.id));
   const missing: CollectedRecord[] = [];
