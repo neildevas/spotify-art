@@ -34,7 +34,7 @@ import {
 import { handleCallback, hasSession, logout } from './spotify/auth';
 import type { AlbumGroup, Artist, ArtItem, TimeRange, User } from './spotify/types';
 
-type Sort = 'recent' | 'artist' | 'year';
+type Sort = 'recent' | 'title' | 'artist' | 'year';
 type TrackMode = 'grouped' | 'tracks';
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -49,6 +49,7 @@ const TRACK_MODES: { id: TrackMode; label: string }[] = [
 function sortItems(items: ArtItem[], sort: Sort) {
   if (sort === 'recent') return items;
   const copy = [...items];
+  if (sort === 'title') copy.sort((a, b) => a.title.localeCompare(b.title));
   if (sort === 'artist') copy.sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
   if (sort === 'year') copy.sort((a, b) => b.year.localeCompare(a.year));
   return copy;
@@ -105,7 +106,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Artists and records now share the Collection tab (older "Saved albums" / "Artists" tabs map here).
   const view: View = storedView === 'albums' || storedView === 'artists' ? 'collection' : storedView;
   const [tileSize, setTileSize] = usePersisted('sleeve.tile', 180);
-  const [collectionShelf, setCollectionShelf] = usePersisted<CollectionShelf>('sleeve.collectionShelf', 'artists');
+  const [collectionShelf, setCollectionShelf] = usePersisted<CollectionShelf>('sleeve.collectionShelf.v2', 'records'); // Records first: the everyday view
+  // Quick filter on the Records grid (album or artist); not remembered between visits.
+  const [recordQuery, setRecordQuery] = useState('');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
   const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
   const records = useCollection();
@@ -134,9 +137,14 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const shelfPins = artist ? artistShelf.find((a) => a.id === artist.id)?.pinned : undefined;
 
   // Records and artists are stored newest-first, so "recent" is already in order.
-  const collectionItems = useMemo(() => sortItems(records.map(recordToItem), collectionSort), [records, collectionSort]);
+  const collectionItems = useMemo(() => {
+    const q = recordQuery.trim().toLowerCase();
+    const all = records.map(recordToItem);
+    const shown = q ? all.filter((r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)) : all;
+    return sortItems(shown, collectionSort);
+  }, [records, collectionSort, recordQuery]);
   const sortedArtists = useMemo(
-    () => (collectionSort === 'artist' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
+    () => (collectionSort !== 'recent' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
     [artistShelf, collectionSort],
   );
 
@@ -283,6 +291,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
             <CollectionView
               artists={sortedArtists}
               records={collectionItems}
+              totalRecords={records.length}
+              query={recordQuery}
+              onQuery={setRecordQuery}
               shelf={collectionShelf}
               onShelf={setCollectionShelf}
               sort={collectionSort}

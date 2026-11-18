@@ -87,8 +87,12 @@ export const collection = {
     if (records.some((r) => r.id === record.id)) return;
     commit([{ ...record, addedAt: Date.now() }, ...records]);
   },
+  /** Removing a record also takes it off any artist's top shelf — you can only display what you own. */
   remove(id: string) {
     commit(records.filter((r) => r.id !== id));
+    if (artists.some((a) => a.pinned?.some((r) => r.id === id))) {
+      commitArtists(artists.map((a) => (a.pinned?.some((r) => r.id === id) ? { ...a, pinned: a.pinned.filter((r) => r.id !== id) } : a)));
+    }
   },
   toggle(record: RecordInfo) {
     if (records.some((r) => r.id === record.id)) this.remove(record.id);
@@ -111,6 +115,7 @@ export const collection = {
     const haveArtists = new Set(artists.map((a) => a.id));
     const freshArtists = incomingArtists.filter((a) => a && typeof a.id === 'string' && a.name && !haveArtists.has(a.id));
     if (freshArtists.length) commitArtists([...artists, ...freshArtists].sort((a, b) => b.addedAt - a.addedAt));
+    collectPinnedRecords();
 
     return fresh.length + freshArtists.length;
   },
@@ -148,12 +153,15 @@ export const savedArtists = {
   update(id: string, patch: Partial<Pick<SavedArtist, 'note' | 'pinned' | 'favTracks'>>) {
     commitArtists(artists.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   },
+  /** Pinning puts a record on the top shelf, so it joins your collection too. Unpinning keeps it there. */
   togglePin(id: string, record: RecordInfo) {
     const a = artists.find((x) => x.id === id);
     if (!a) return;
     const pinned = a.pinned ?? [];
+    const pinning = !pinned.some((r) => r.id === record.id);
+    if (pinning) collection.add(record);
     this.update(id, {
-      pinned: pinned.some((r) => r.id === record.id) ? pinned.filter((r) => r.id !== record.id) : [...pinned, record],
+      pinned: pinning ? [...pinned, record] : pinned.filter((r) => r.id !== record.id),
     });
   },
   toggleFav(id: string, track: FavTrack) {
@@ -177,3 +185,17 @@ export function useSavedArtists() {
 export function useIsArtistSaved(id: string | undefined) {
   return useSyncExternalStore(subscribe, () => (id ? artists.some((a) => a.id === id) : false));
 }
+
+/** Pins made before pins counted as collecting: make sure every pinned record is in the collection. */
+function collectPinnedRecords() {
+  const have = new Set(records.map((r) => r.id));
+  const missing: CollectedRecord[] = [];
+  for (const a of artists)
+    for (const r of a.pinned ?? []) {
+      if (have.has(r.id)) continue;
+      have.add(r.id);
+      missing.push({ ...r, addedAt: a.addedAt });
+    }
+  if (missing.length) commit([...records, ...missing].sort((x, y) => y.addedAt - x.addedAt));
+}
+collectPinnedRecords();

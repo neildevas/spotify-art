@@ -6,17 +6,26 @@ import { ArtGrid } from './ArtGrid';
 import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
-export type CollectionSort = 'recent' | 'artist' | 'year';
+export type CollectionSort = 'recent' | 'title' | 'artist' | 'year';
 export type CollectionShelf = 'artists' | 'records';
 
-const SORTS: { id: CollectionSort; label: string }[] = [
+const RECORD_SORTS: { id: CollectionSort; label: string }[] = [
+  { id: 'recent', label: 'Recently added' },
+  { id: 'title', label: 'Album' },
+  { id: 'artist', label: 'Artist' },
+];
+// Artists only have a name to sort by; any non-"recent" choice sorts them A–Z.
+const ARTIST_SORTS: { id: CollectionSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
   { id: 'artist', label: 'Name' },
 ];
 
 type Props = {
   artists: SavedArtist[]; // already sorted
-  records: ArtItem[]; // already sorted
+  records: ArtItem[]; // already filtered and sorted
+  totalRecords: number;
+  query: string;
+  onQuery: (q: string) => void;
   shelf: CollectionShelf;
   onShelf: (s: CollectionShelf) => void;
   sort: CollectionSort;
@@ -29,12 +38,15 @@ type Props = {
 };
 
 /**
- * The collection, in two shelves: artists (the main thing you collect) and single records —
- * albums kept on their own, without collecting the whole artist.
+ * The collection: every record you've kept (the everyday view, ready to play), and the artists
+ * you've collected as another way in.
  */
 export function CollectionView({
   artists,
   records,
+  totalRecords,
+  query,
+  onQuery,
   shelf,
   onShelf,
   sort,
@@ -48,7 +60,7 @@ export function CollectionView({
   const file = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
   const collectedIds = new Set(artists.map((a) => a.id));
-  const empty = artists.length === 0 && records.length === 0;
+  const empty = artists.length === 0 && totalRecords === 0;
 
   const exportCollection = () => {
     const blob = new Blob([collection.exportJson()], { type: 'application/json' });
@@ -74,12 +86,19 @@ export function CollectionView({
         <motion.h1 className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
           Your collection
           <span className="count">
-            {artists.length} artist{artists.length === 1 ? '' : 's'} · {records.length} single record
-            {records.length === 1 ? '' : 's'}
+            {totalRecords} record{totalRecords === 1 ? '' : 's'} · {artists.length} artist{artists.length === 1 ? '' : 's'}
           </span>
         </motion.h1>
         <div className="collection-tools">
-          {!empty && <Segmented small groupId="collectionSort" value={sort === 'year' ? 'recent' : sort} options={SORTS} onChange={onSort} />}
+          {!empty && (
+            <Segmented
+              small
+              groupId="collectionSort"
+              value={shelf === 'artists' ? (sort === 'recent' ? 'recent' : 'artist') : sort === 'year' ? 'recent' : sort}
+              options={shelf === 'artists' ? ARTIST_SORTS : RECORD_SORTS}
+              onChange={onSort}
+            />
+          )}
           {!empty && (
             <button className="text-btn" onClick={exportCollection} title="Download a backup of your collection">
               Export
@@ -109,10 +128,22 @@ export function CollectionView({
             value={shelf}
             onChange={onShelf}
             options={[
-              { id: 'artists', label: 'Artists' },
               { id: 'records', label: 'Records' },
+              { id: 'artists', label: 'Artists' },
             ]}
           />
+          {shelf === 'records' && totalRecords > 0 && (
+            <label className="record-filter">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => onQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Escape' && query && (e.stopPropagation(), onQuery(''))}
+                placeholder="Filter by album or artist"
+                aria-label="Filter records by album or artist"
+              />
+            </label>
+          )}
         </div>
       )}
 
@@ -169,7 +200,18 @@ export function CollectionView({
             </motion.div>
           ) : (
             <p className="search-hint">
-              No single records. Keep one album on its own from its page with <strong>Add record</strong>.
+              {query ? (
+                <>
+                  Nothing matches “{query}”.{' '}
+                  <button className="text-btn inline-link" onClick={() => onQuery('')}>
+                    Clear filter
+                  </button>
+                </>
+              ) : (
+                <>
+                  No records yet. Open any album and hit <strong>Add record</strong>, or pin one on an artist’s page.
+                </>
+              )}
             </p>
           )}
         </motion.section>

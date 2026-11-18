@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
-import { collection, useInCollection } from '../collection/store';
+import { collection, useInCollection, useSavedArtists } from '../collection/store';
 import type { RecordInfo } from '../spotify/types';
 
 /** Add / remove a record from the local collection, with a little "pressed into the crate" moment. */
 export function CollectButton({ record, isSong }: { record: RecordInfo; isSong?: boolean }) {
   const inCollection = useInCollection(record.id);
+  const pinned = useSavedArtists().some((a) => a.pinned?.some((r) => r.id === record.id));
   // Right after adding, the cursor is still on the button — don't flip straight to "Remove".
   const [fresh, setFresh] = useState(false);
   const addLabel = isSong ? 'Add this record' : 'Add record';
@@ -21,7 +22,7 @@ export function CollectButton({ record, isSong }: { record: RecordInfo; isSong?:
       whileTap={{ scale: 0.95 }}
       layout
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-      title={inCollection ? 'Remove from your collection' : isSong ? `Adds “${record.name}” to your collection` : undefined}
+      title={inCollection ? (pinned ? 'Remove from your collection (also takes it off the top shelf)' : 'Remove from your collection') : isSong ? `Adds “${record.name}” to your collection` : undefined}
     >
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span

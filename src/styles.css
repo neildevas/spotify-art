@@ -722,7 +722,15 @@ img.np-link:hover { transform: scale(1.06); }
 .tile:hover .collect-artist-btn, .collect-artist-btn:focus-visible { opacity: 1; transform: translateZ(40px) translateY(0); }
 
 /* Unified collection: artists first, single records below */
-.collection-shelves { margin: -4px 0 28px; }
+.collection-shelves { margin: -4px 0 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.record-filter { margin-left: auto; }
+.record-filter input {
+  width: min(280px, 70vw); height: 38px; padding: 0 16px; border-radius: 999px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--fg); font: inherit; font-size: 13px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.record-filter input::placeholder { color: var(--fg-faint); }
+.record-filter input:focus { outline: none; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); }
 .inline-link { padding: 0; text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
