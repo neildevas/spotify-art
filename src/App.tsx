@@ -9,6 +9,8 @@ import { NowPlayingBar } from './player/NowPlayingBar';
 import { PlayerProvider } from './player/PlayerContext';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
+import { type LikesSort, LikesView } from './components/LikesView';
+import { clearLikes, useLikes } from './hooks/useLikes';
 import {
   type SearchFilter,
   clearLibrary,
@@ -24,6 +26,7 @@ import {
   getArtist,
   isPlayable,
   artistRecordItems,
+  likedRecordToItem,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -90,6 +93,7 @@ export default function App() {
     logout();
     clearCache();
     clearLibrary();
+    clearLikes();
     setAuthed(false);
   }, []);
 
@@ -119,6 +123,10 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = usePersisted<SearchFilter>('sleeve.searchFilter', 'all');
+  // Search Spotify, or browse records from your Spotify liked songs.
+  const [searchMode, setSearchMode] = usePersisted<'spotify' | 'likes'>('sleeve.searchMode', 'spotify');
+  const [likesSort, setLikesSort] = usePersisted<LikesSort>('sleeve.likesSort', 'most');
+  const [hideOwned, setHideOwned] = usePersisted('sleeve.likesHideOwned', true);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [selected, setSelected] = useState<ArtItem | null>(null);
@@ -136,6 +144,34 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const artistInCollection = view === 'collection' && !!artist && artistOrigin === 'collection';
   // Your records by the open artist come first on their page (and in the overlay's ← → order).
   const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
+
+  // Liked songs → one item per record, with how many of its songs you've liked.
+  const showLikes = view === 'search' && searchMode === 'likes' && !artist;
+  const likes = useLikes(showLikes, onSignOut);
+  const likedRecords = useMemo(() => {
+    const byAlbum = new Map<string, { ids: string[]; last: number }>();
+    for (const l of likes.likes) {
+      const g = byAlbum.get(l.albumId) ?? { ids: [], last: 0 };
+      g.ids.push(l.trackId);
+      g.last = Math.max(g.last, l.addedAt);
+      byAlbum.set(l.albumId, g);
+    }
+    return [...byAlbum]
+      .filter(([id]) => likes.albums[id])
+      .map(([id, g]) => ({ item: likedRecordToItem(likes.albums[id], g.ids), count: g.ids.length, last: g.last }));
+  }, [likes.likes, likes.albums]);
+  const ownedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
+  const likedItems = useMemo(() => {
+    const shown = hideOwned ? likedRecords.filter((r) => !ownedIds.has(r.item.albumId!)) : [...likedRecords];
+    shown.sort((a, b) => (likesSort === 'most' ? b.count - a.count || b.last - a.last : b.last - a.last));
+    return shown.map((r) => r.item);
+  }, [likedRecords, ownedIds, hideOwned, likesSort]);
+  const likesStats = {
+    songs: likes.likes.length,
+    records: likedRecords.length,
+    missing: likedRecords.filter((r) => !ownedIds.has(r.item.albumId!)).length,
+    total: likes.total,
+  };
 
   // Records and artists are stored newest-first, so "recent" is already in order.
   const collectionItems = useMemo(() => {
@@ -164,7 +200,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
       ? collectionItems
       : view === 'tracks'
         ? trackItems
-        : artist
+        : showLikes
+          ? likedItems
+          : artist
           ? artistAlbums.items
           : [...searchAlbumItems, ...searchSongItems];
 
@@ -304,6 +342,36 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onBrowse={() => setView('search')}
             />
           ) : view === 'search' ? (
+            <>
+            {!artist && (
+              <div className="search-modes">
+                <Segmented
+                  groupId="searchMode"
+                  value={searchMode}
+                  onChange={setSearchMode}
+                  options={[
+                    { id: 'spotify', label: 'Search Spotify' },
+                    { id: 'likes', label: '♥ From your likes' },
+                  ]}
+                />
+              </div>
+            )}
+            {showLikes ? (
+              <LikesView
+                items={likedItems}
+                stats={likesStats}
+                loading={likes.loading}
+                refreshing={likes.refreshing}
+                error={likes.error}
+                sort={likesSort}
+                onSort={setLikesSort}
+                hideOwned={hideOwned}
+                onHideOwned={setHideOwned}
+                tileSize={tileSize}
+                onSelect={setSelected}
+                onRefresh={likes.refresh}
+              />
+            ) : (
             <SearchView
               query={query}
               onQuery={setQuery}
@@ -320,6 +388,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               tileSize={tileSize}
               onSelect={setSelected}
             />
+            )}
+            </>
           ) : (
             <>
               <div className="toolbar">

@@ -137,6 +137,7 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
                       t.id && t.id === item.highlightTrackId ? 'is-current' : '',
                       playable ? 'is-playable' : '',
                       t.id && t.id === player.nowPlaying?.trackId ? 'is-playing' : '',
+                      t.id && item.likedTrackIds?.includes(t.id) ? 'is-liked' : '',
                     ].join(' ')}
                     onClick={playable ? () => player.playAlbum(item.albumId!, i) : undefined}
                   >
