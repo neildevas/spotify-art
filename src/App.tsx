@@ -123,8 +123,6 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = usePersisted<SearchFilter>('sleeve.searchFilter', 'all');
-  // Search Spotify, or browse records from your Spotify liked songs.
-  const [searchMode, setSearchMode] = usePersisted<'spotify' | 'likes'>('sleeve.searchMode', 'spotify');
   const [hideOwned, setHideOwned] = usePersisted('sleeve.likesHideOwned', false);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -145,7 +143,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
 
   // Liked songs, newest first (Spotify's order). Duplicate records are fine: each row is a song.
-  const showLikes = view === 'search' && searchMode === 'likes' && !artist;
+  const showLikes = view === 'collection' && collectionShelf === 'likes' && !artist;
   const likes = useLikes(showLikes, onSignOut);
   const ownedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
   const likeRows = useMemo<LikeRow[]>(() => {
@@ -190,13 +188,13 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const items =
     artist && (artistInCollection || view === 'search')
       ? [...artistRecords, ...artistAlbums.items]
+      : showLikes
+      ? likedItems
       : view === 'collection'
       ? collectionItems
       : view === 'tracks'
         ? trackItems
-        : showLikes
-          ? likedItems
-          : artist
+        : artist
           ? artistAlbums.items
           : [...searchAlbumItems, ...searchSongItems];
 
@@ -334,36 +332,21 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onOpenArtist={openSavedArtistFresh}
               onCollectArtist={collectArtist}
               onBrowse={() => setView('search')}
+              likes={
+                <LikesView
+                  rows={shownLikeRows}
+                  stats={likesStats}
+                  loading={likes.loading}
+                  refreshing={likes.refreshing}
+                  error={likes.error}
+                  hideOwned={hideOwned}
+                  onHideOwned={setHideOwned}
+                  onSelect={setSelected}
+                  onRefresh={likes.refresh}
+                />
+              }
             />
           ) : view === 'search' ? (
-            <>
-            {!artist && (
-              <div className="search-modes">
-                <Segmented
-                  groupId="searchMode"
-                  value={searchMode}
-                  onChange={setSearchMode}
-                  options={[
-                    { id: 'spotify', label: 'Search Spotify' },
-                    { id: 'likes', label: '♥ From your likes' },
-                  ]}
-                />
-              </div>
-            )}
-            {showLikes ? (
-              <LikesView
-                rows={shownLikeRows}
-                stats={likesStats}
-                loading={likes.loading}
-                refreshing={likes.refreshing}
-                error={likes.error}
-                hideOwned={hideOwned}
-                onHideOwned={setHideOwned}
-                tileSize={tileSize}
-                onSelect={setSelected}
-                onRefresh={likes.refresh}
-              />
-            ) : (
             <SearchView
               query={query}
               onQuery={setQuery}
@@ -380,8 +363,6 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               tileSize={tileSize}
               onSelect={setSelected}
             />
-            )}
-            </>
           ) : (
             <>
               <div className="toolbar">

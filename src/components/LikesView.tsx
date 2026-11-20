@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { collection, useInCollection } from '../collection/store';
 import type { Like } from '../hooks/useLikes';
 import type { ArtItem } from '../spotify/types';
@@ -13,7 +12,6 @@ type Props = {
   error: Error | null;
   hideOwned: boolean;
   onHideOwned: (v: boolean) => void;
-  tileSize: number;
   onSelect: (item: ArtItem) => void;
   onRefresh: () => void;
 };
@@ -35,15 +33,12 @@ function likedWhen(ms: number) {
 export function LikesView({ rows, stats, loading, refreshing, error, hideOwned, onHideOwned, onSelect, onRefresh }: Props) {
   return (
     <>
-      <div className="toolbar likes-toolbar">
-        <motion.h1 className="view-title" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
-          From your likes
-          <span className="count">
-            {loading && stats.total
-              ? `Loading ${stats.songs.toLocaleString()} of ${stats.total.toLocaleString()} liked songs…`
-              : `${stats.songs.toLocaleString()} liked songs · ${stats.missing.toLocaleString()} not in your collection`}
-          </span>
-        </motion.h1>
+      <div className="likes-bar">
+        <span className="likes-count">
+          {loading && stats.total
+            ? `Loading ${stats.songs.toLocaleString()} of ${stats.total.toLocaleString()} liked songs…`
+            : `${stats.songs.toLocaleString()} liked songs on Spotify · ${stats.missing.toLocaleString()} not in your collection`}
+        </span>
         <div className="collection-tools">
           <label className="switch">
             <input type="checkbox" checked={hideOwned} onChange={(e) => onHideOwned(e.target.checked)} />

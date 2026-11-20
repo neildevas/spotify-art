@@ -786,7 +786,6 @@ img.np-link:hover { transform: scale(1.06); }
 .fav-setlist-head .eyebrow { margin: 0; }
 
 /* ---------- From your likes ---------- */
-.search-modes { margin: 4px 0 28px; }
 .tracklist li.is-liked .tl-title { font-weight: 600; color: #fff; }
 .tracklist li.is-liked .tl-title::after { content: '  ♥'; color: var(--accent); font-size: 0.85em; }
 .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-dim); cursor: pointer; user-select: none; }
@@ -835,3 +834,6 @@ img.np-link:hover { transform: scale(1.06); }
   .likes-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
   .likes-n, .likes-record, .likes-meta, .likes-head { display: none; }
 }
+
+.likes-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: -8px 0 18px; }
+.likes-count { font-size: 13px; color: var(--fg-faint); }
