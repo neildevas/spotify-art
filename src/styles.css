@@ -799,41 +799,4 @@ img.np-link:hover { transform: scale(1.06); }
 .switch input:checked + .switch-track::after { transform: translateX(12px); background: #0b0b0c; }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--fg); outline-offset: 2px; }
 
-.likes-table { display: flex; flex-direction: column; }
-.likes-row {
-  display: grid; align-items: center; gap: 16px; padding: 8px 10px; border-radius: 8px;
-  grid-template-columns: 36px 48px minmax(0, 1.4fr) minmax(0, 1fr) 96px 48px 168px;
-  cursor: pointer; transition: background 0.15s;
-  content-visibility: auto; contain-intrinsic-size: auto 64px;
-}
-.likes-row:hover, .likes-row:focus-visible { background: rgba(255,255,255,0.05); outline: none; }
-.likes-head {
-  cursor: default; padding-bottom: 10px; margin-bottom: 4px; border-radius: 0; border-bottom: 1px solid var(--line);
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-faint);
-}
-.likes-head:hover { background: none; }
-.likes-n, .likes-meta { font-size: 12px; color: var(--fg-faint); font-variant-numeric: tabular-nums; }
-.likes-cover { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: rgba(255,255,255,0.06); }
-.likes-song { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.likes-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.likes-sub { font-size: 12px; color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.likes-record { font-size: 13px; color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.likes-type { color: var(--fg-faint); }
-.likes-add {
-  justify-self: end; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
-  border: 1px solid rgba(255,255,255,0.18); color: var(--fg); transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.likes-row:hover .likes-add:not(.is-in) { background: var(--fg); color: var(--bg); border-color: var(--fg); }
-.likes-add.is-in { color: var(--fg-dim); }
-.likes-add .when-hover { display: none; }
-.likes-add.is-in:hover .when-idle { display: none; }
-.likes-add.is-in:hover .when-hover { display: inline; }
-.likes-add.is-in:hover { color: var(--fg); border-color: rgba(255,255,255,0.4); }
-.likes-loading { padding: 16px 10px; font-size: 13px; color: var(--fg-faint); }
-@media (max-width: 860px) {
-  .likes-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
-  .likes-n, .likes-record, .likes-meta, .likes-head { display: none; }
-}
 
-.likes-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: -8px 0 18px; }
-.likes-count { font-size: 13px; color: var(--fg-faint); }

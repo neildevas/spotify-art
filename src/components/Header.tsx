@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import type { User } from '../spotify/types';
 
-export type View = 'collection' | 'artists' | 'albums' | 'tracks' | 'search';
+export type View = 'collection' | 'likes' | 'artists' | 'albums' | 'tracks' | 'search';
 
 type Props = {
   view: View;
@@ -14,6 +14,7 @@ type Props = {
 
 const TABS: { id: View; label: string }[] = [
   { id: 'collection', label: 'Collection' },
+  { id: 'likes', label: 'Likes' },
   { id: 'search', label: 'Search' },
 ];
 

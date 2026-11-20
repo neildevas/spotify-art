@@ -7,7 +7,7 @@ import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
 export type CollectionSort = 'recent' | 'title' | 'artist' | 'year';
-export type CollectionShelf = 'records' | 'artists' | 'likes';
+export type CollectionShelf = 'records' | 'artists';
 
 const RECORD_SORTS: { id: CollectionSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
@@ -35,8 +35,8 @@ type Props = {
   onOpenArtist: (a: SavedArtist) => void;
   onCollectArtist: (a: { id: string; name: string }) => void;
   onBrowse: () => void;
-  /** The "From your likes" shelf, rendered by App (it owns the likes data). */
-  likes: React.ReactNode;
+  /** Go to the Likes tab (records from your Spotify liked songs). */
+  onBrowseLikes: () => void;
 };
 
 /**
@@ -58,7 +58,7 @@ export function CollectionView({
   onOpenArtist,
   onCollectArtist,
   onBrowse,
-  likes,
+  onBrowseLikes,
 }: Props) {
   const file = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export function CollectionView({
           </span>
         </motion.h1>
         <div className="collection-tools">
-          {!empty && shelf !== 'likes' && (
+          {!empty && (
             <Segmented
               small
               groupId="collectionSort"
@@ -132,7 +132,6 @@ export function CollectionView({
           options={[
             { id: 'records', label: 'Records' },
             { id: 'artists', label: 'Artists' },
-            { id: 'likes', label: 'From your likes' },
           ]}
         />
         {shelf === 'records' && totalRecords > 0 && (
@@ -151,11 +150,7 @@ export function CollectionView({
 
       {note && <p className="search-hint">{note}</p>}
 
-      {shelf === 'likes' ? (
-        <motion.section key="likes" className="collection-section" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          {likes}
-        </motion.section>
-      ) : empty ? (
+      {empty ? (
         <motion.div className="empty-collection" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h2>An empty crate</h2>
           <p>
@@ -166,7 +161,7 @@ export function CollectionView({
             <button className="btn-collect" onClick={onBrowse}>
               Start digging
             </button>
-            <button className="btn-ghost" onClick={() => onShelf('likes')}>
+            <button className="btn-ghost" onClick={onBrowseLikes}>
               Start from your liked songs
             </button>
           </div>
