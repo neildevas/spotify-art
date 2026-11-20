@@ -7,7 +7,7 @@ import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
 export type CollectionSort = 'recent' | 'title' | 'artist' | 'year';
-export type CollectionShelf = 'artists' | 'records';
+export type CollectionShelf = 'records' | 'artists';
 
 const RECORD_SORTS: { id: CollectionSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
@@ -35,6 +35,8 @@ type Props = {
   onOpenArtist: (a: SavedArtist) => void;
   onCollectArtist: (a: { id: string; name: string }) => void;
   onBrowse: () => void;
+  /** Go to the Likes tab (records from your Spotify liked songs). */
+  onBrowseLikes: () => void;
 };
 
 /**
@@ -56,6 +58,7 @@ export function CollectionView({
   onOpenArtist,
   onCollectArtist,
   onBrowse,
+  onBrowseLikes,
 }: Props) {
   const file = useRef<HTMLInputElement>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -121,31 +124,29 @@ export function CollectionView({
         </div>
       </div>
 
-      {!empty && (
-        <div className="collection-shelves">
-          <Segmented
-            groupId="collectionShelf"
-            value={shelf}
-            onChange={onShelf}
-            options={[
-              { id: 'records', label: 'Records' },
-              { id: 'artists', label: 'Artists' },
-            ]}
-          />
-          {shelf === 'records' && totalRecords > 0 && (
-            <label className="record-filter">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => onQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Escape' && query && (e.stopPropagation(), onQuery(''))}
-                placeholder="Filter by album or artist"
-                aria-label="Filter records by album or artist"
-              />
-            </label>
-          )}
-        </div>
-      )}
+      <div className="collection-shelves">
+        <Segmented
+          groupId="collectionShelf"
+          value={shelf}
+          onChange={onShelf}
+          options={[
+            { id: 'records', label: 'Records' },
+            { id: 'artists', label: 'Artists' },
+          ]}
+        />
+        {shelf === 'records' && totalRecords > 0 && (
+          <label className="record-filter">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && query && (e.stopPropagation(), onQuery(''))}
+              placeholder="Filter by album or artist"
+              aria-label="Filter records by album or artist"
+            />
+          </label>
+        )}
+      </div>
 
       {note && <p className="search-hint">{note}</p>}
 
@@ -159,6 +160,9 @@ export function CollectionView({
           <div className="empty-actions">
             <button className="btn-collect" onClick={onBrowse}>
               Start digging
+            </button>
+            <button className="btn-ghost" onClick={onBrowseLikes}>
+              Start from your liked songs
             </button>
           </div>
         </motion.div>

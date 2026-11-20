@@ -9,6 +9,7 @@ import type {
   CollectedRecord,
   Paging,
   SavedAlbum,
+  SavedTrack,
   TimeRange,
   RecordInfo,
   Track,
@@ -176,6 +177,18 @@ export async function* savedAlbums(): AsyncGenerator<SavedAlbum[]> {
   }
 }
 
+export const likedTracksHead = () => spotify<Paging<SavedTrack>>('/me/tracks?limit=1');
+
+/** Yields your liked songs (Spotify's "Liked Songs") page by page, newest first, with the overall total. */
+export async function* likedTracks(): AsyncGenerator<{ items: SavedTrack[]; total: number }> {
+  let next: string | null = '/me/tracks?limit=50';
+  while (next) {
+    const page: Paging<SavedTrack> = await get<Paging<SavedTrack>>(next, 0); // dedupe only
+    yield { items: page.items, total: page.total };
+    next = page.next;
+  }
+}
+
 // Top tracks only shift slowly; six hours is plenty fresh.
 export const topTracks = (range: TimeRange) =>
   get<Paging<Track>>(`/me/top/tracks?limit=50&time_range=${range}`, 6 * HOUR, true);
@@ -284,6 +297,22 @@ export function albumToItem({ album, added_at }: SavedAlbum): ArtItem {
     albumId: album.id,
     artists: artistRefs(album.artists),
     record: albumRecord(album),
+  };
+}
+
+/**
+ * A record from your liked songs: the album, with every song you've liked on it marked and the
+ * most recently liked one highlighted when it opens.
+ */
+export function likedRecordToItem(album: Album, likedOnAlbum: string[]): ArtItem {
+  const base = artistAlbumToItem(album);
+  const n = likedOnAlbum.length;
+  return {
+    ...base,
+    key: `liked-${album.id}`,
+    highlightTrackId: likedOnAlbum[0],
+    likedTrackIds: likedOnAlbum,
+    details: [...base.details, `♥ ${n} liked song${n === 1 ? '' : 's'}`],
   };
 }
 
@@ -399,7 +428,7 @@ export function recordToItem(r: CollectedRecord): ArtItem {
 
 /** Albums you can play from Sleeve: your records and an artist's discography. */
 export const isPlayable = (item: ArtItem) =>
-  !!item.albumId && /^(record|artistalbum)-/.test(item.key);
+  !!item.albumId && /^(record|artistalbum|liked)-/.test(item.key);
 
 /** Your collected records by one artist, oldest release first (your slice of their discography). */
 export function artistRecordItems(records: CollectedRecord[], artistId: string): ArtItem[] {

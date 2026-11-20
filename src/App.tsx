@@ -9,6 +9,8 @@ import { NowPlayingBar } from './player/NowPlayingBar';
 import { PlayerProvider } from './player/PlayerContext';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
+import { LikesView } from './components/LikesView';
+import { clearLikes, useLikes } from './hooks/useLikes';
 import {
   type SearchFilter,
   clearLibrary,
@@ -24,6 +26,7 @@ import {
   getArtist,
   isPlayable,
   artistRecordItems,
+  likedRecordToItem,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -90,6 +93,7 @@ export default function App() {
     logout();
     clearCache();
     clearLibrary();
+    clearLikes();
     setAuthed(false);
   }, []);
 
@@ -106,7 +110,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Artists and records now share the Collection tab (older "Saved albums" / "Artists" tabs map here).
   const view: View = storedView === 'albums' || storedView === 'artists' ? 'collection' : storedView;
   const [tileSize, setTileSize] = usePersisted('sleeve.tile', 180);
-  const [collectionShelf, setCollectionShelf] = usePersisted<CollectionShelf>('sleeve.collectionShelf.v2', 'records'); // Records first: the everyday view
+  const [storedShelf, setCollectionShelf] = usePersisted<CollectionShelf | 'likes'>('sleeve.collectionShelf.v2', 'records'); // Records first: the everyday view
+  // "From your likes" moved to its own top tab.
+  const collectionShelf: CollectionShelf = storedShelf === 'likes' ? 'records' : storedShelf;
   // Quick filter on the Records grid (album or artist); not remembered between visits.
   const [recordQuery, setRecordQuery] = useState('');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
@@ -119,6 +125,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = usePersisted<SearchFilter>('sleeve.searchFilter', 'all');
+  const [hideOwned, setHideOwned] = usePersisted('sleeve.likesHideOwned', false);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [selected, setSelected] = useState<ArtItem | null>(null);
@@ -136,6 +143,34 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const artistInCollection = view === 'collection' && !!artist && artistOrigin === 'collection';
   // Your records by the open artist come first on their page (and in the overlay's ← → order).
   const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
+
+  // Records from your Spotify liked songs (Collection → From your likes).
+  const showLikes = view === 'likes' && !artist;
+  const likes = useLikes(showLikes, onSignOut);
+  const ownedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
+  // One tile per record, in the order of its most recent liked song. Likes arrive newest first, so a
+  // record's place is fixed the first time it shows up: later pages only add records at the end.
+  const likedRecords = useMemo(() => {
+    const byAlbum = new Map<string, string[]>();
+    for (const l of likes.likes) {
+      const ids = byAlbum.get(l.albumId);
+      if (ids) ids.push(l.trackId);
+      else byAlbum.set(l.albumId, [l.trackId]);
+    }
+    return [...byAlbum].filter(([id]) => likes.albums[id]).map(([id, ids]) => likedRecordToItem(likes.albums[id], ids));
+  }, [likes.likes, likes.albums]);
+  const likedItems = useMemo(
+    () => (hideOwned ? likedRecords.filter((r) => !ownedIds.has(r.albumId!)) : likedRecords),
+    [likedRecords, ownedIds, hideOwned],
+  );
+  const likesStats = {
+    songs: likes.likes.length,
+    records: likedRecords.length,
+    missing: likedRecords.filter((r) => !ownedIds.has(r.albumId!)).length,
+    total: likes.total,
+  };
+
+
 
   // Records and artists are stored newest-first, so "recent" is already in order.
   const collectionItems = useMemo(() => {
@@ -160,6 +195,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const items =
     artist && (artistInCollection || view === 'search')
       ? [...artistRecords, ...artistAlbums.items]
+      : showLikes
+      ? likedItems
       : view === 'collection'
       ? collectionItems
       : view === 'tracks'
@@ -258,7 +295,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
           onView={(v) => {
             setSelected(null);
             // An artist page opened from the Collection belongs to that visit; leaving the tab closes it.
-            if (artistOrigin === 'collection') setArtist(null);
+            // Likes never shows an artist page, so going there closes one too.
+            if (artistOrigin === 'collection' || v === 'likes') setArtist(null);
             setView(v);
           }}
           tileSize={tileSize}
@@ -302,8 +340,22 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onOpenArtist={openSavedArtistFresh}
               onCollectArtist={collectArtist}
               onBrowse={() => setView('search')}
+              onBrowseLikes={() => setView('likes')}
             />
-          ) : view === 'search' ? (
+          ) : showLikes ? (
+            <LikesView
+              items={likedItems}
+              stats={likesStats}
+              tileSize={tileSize}
+              loading={likes.loading}
+              refreshing={likes.refreshing}
+              error={likes.error}
+              hideOwned={hideOwned}
+              onHideOwned={setHideOwned}
+              onSelect={setSelected}
+              onRefresh={likes.refresh}
+            />
+          ) : view === 'search' || view === 'likes' ? (
             <SearchView
               query={query}
               onQuery={setQuery}

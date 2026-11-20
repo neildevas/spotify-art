@@ -36,6 +36,7 @@ export type AlbumTrack = {
 export type Paging<T> = { items: T[]; next: string | null; total: number; limit: number; offset: number };
 
 export type SavedAlbum = { added_at: string; album: Album };
+export type SavedTrack = { added_at: string; track: Track };
 
 export type Artist = {
   id: string;
@@ -72,6 +73,8 @@ export type ArtItem = {
   artists?: { id: string; name: string }[];
   /** The record (album / single / EP) this tile belongs to, so it can be added to the collection. */
   record?: RecordInfo;
+  /** From your likes: the songs on this record you've liked on Spotify (shown as a ♥ count and in the tracklist). */
+  likedTrackIds?: string[];
 };
 
 /** Everything needed to show a record without asking Spotify again. */
