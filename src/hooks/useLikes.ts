@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthError, likedTracks, likedTracksHead } from '../spotify/api';
+import { formatDuration } from '../spotify/api';
 import type { Album, SavedTrack } from '../spotify/types';
 
 /**
@@ -8,10 +9,10 @@ import type { Album, SavedTrack } from '../spotify/types';
  *  - checked in the last 6h → no requests
  *  - otherwise one tiny request (limit=1) to see if anything changed; only then refetch it all
  */
-const KEY = 'sleeve.likes.v1';
+const KEY = 'sleeve.likes.v2';
 const FRESH_MS = 6 * 60 * 60 * 1000;
 
-export type Like = { trackId: string; albumId: string; addedAt: number };
+export type Like = { trackId: string; albumId: string; addedAt: number; name: string; artists: string; duration: string };
 type Stored = { likes: Like[]; albums: Record<string, Album>; total: number; firstId: string | null; checkedAt: number };
 
 function read(): Stored | null {
@@ -32,6 +33,7 @@ function write(s: Stored) {
 export function clearLikes() {
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem('sleeve.likes.v1'); // older, record-grouped format
   } catch {
     /* ignore */
   }
@@ -54,7 +56,14 @@ function slimAlbum(a: Album): Album {
 function absorb(page: SavedTrack[], likes: Like[], albums: Record<string, Album>) {
   for (const { added_at, track } of page) {
     if (!track?.id || !track.album?.id) continue; // local files / unavailable songs
-    likes.push({ trackId: track.id, albumId: track.album.id, addedAt: Date.parse(added_at) || 0 });
+    likes.push({
+      trackId: track.id,
+      albumId: track.album.id,
+      addedAt: Date.parse(added_at) || 0,
+      name: track.name,
+      artists: track.artists.map((a) => a.name).join(', '),
+      duration: formatDuration(track.duration_ms),
+    });
     albums[track.album.id] ??= slimAlbum(track.album);
   }
 }
@@ -108,15 +117,13 @@ export function useLikes(enabled: boolean, onAuthError: () => void) {
         const likes: Like[] = [];
         const albums: Record<string, Album> = {};
         let firstId: string | null = null;
-        let pages = 0;
         for await (const page of likedTracks()) {
           if (!alive) return;
           total = page.total;
           firstId ??= page.items[0]?.track?.id ?? null;
           absorb(page.items, likes, albums);
-          pages++;
-          // Re-render every couple of pages; each one regroups the whole list.
-          if (progressive && pages % 2 === 1) setState((s) => ({ ...s, likes: [...likes], albums: { ...albums }, total: Math.max(total, likes.length) }));
+          // New pages only add rows at the bottom, so showing them as they arrive doesn't shuffle anything.
+          if (progressive) setState((s) => ({ ...s, likes: [...likes], albums: { ...albums }, total: Math.max(total, likes.length) }));
         }
         if (!alive) return;
         write({ likes, albums, total: likes.length, firstId, checkedAt: Date.now() });

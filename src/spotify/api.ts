@@ -300,11 +300,20 @@ export function albumToItem({ album, added_at }: SavedAlbum): ArtItem {
   };
 }
 
-/** Records from your liked songs: one item per album, with the liked songs on it. */
-export function likedRecordToItem(album: Album, likedTrackIds: string[]): ArtItem {
+/**
+ * A liked song's record, opened from the "From your likes" list: the album, with that song
+ * highlighted and every song you've liked on it marked.
+ */
+export function likedSongToItem(album: Album, trackId: string, likedOnAlbum: string[]): ArtItem {
   const base = artistAlbumToItem(album);
-  const n = likedTrackIds.length;
-  return { ...base, key: `liked-${album.id}`, likedTrackIds, details: [...base.details, `♥ ${n} liked song${n === 1 ? '' : 's'}`] };
+  const n = likedOnAlbum.length;
+  return {
+    ...base,
+    key: `liked-${trackId}`,
+    highlightTrackId: trackId,
+    likedTrackIds: likedOnAlbum,
+    details: [...base.details, `♥ ${n} liked song${n === 1 ? '' : 's'}`],
+  };
 }
 
 export function artistAlbumToItem(album: Album): ArtItem {

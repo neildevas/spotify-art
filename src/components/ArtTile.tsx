@@ -86,11 +86,6 @@ export const ArtTile = memo(function ArtTile({
 
         {item.rank && <span className="tile-rank">{item.rank}</span>}
         {item.tracks && item.tracks.length > 1 && <span className="tile-count">{item.tracks.length} tracks</span>}
-        {!!item.likedTrackIds?.length && (
-          <span className="tile-likes" title={`${item.likedTrackIds.length} liked song${item.likedTrackIds.length === 1 ? '' : 's'} on this record`}>
-            ♥ {item.likedTrackIds.length}
-          </span>
-        )}
         {showMark && <span className="tile-collected" title="In your collection" aria-label="In your collection" />}
         {onCollectArtist && item.artists?.[0] && (
           // A single record can grow into the whole artist
