@@ -912,8 +912,7 @@ img.np-link:hover { transform: scale(1.06); }
 .btn-suggest.is-on:hover .when-idle { display: none; }
 .btn-suggest.is-on:hover .when-hover { display: inline; }
 
-/* ---------- Records by artist: folders (four covers, iOS-style) or stacks (a pile of sleeves) ---------- */
-.folders-look { display: flex; justify-content: flex-end; margin: -8px 0 18px; }
+/* ---------- Records by artist: iOS-style folders of up to four covers ---------- */
 .folders-grid {
   list-style: none; margin: 0; padding: 0; display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(var(--tile, 180px), 40vw), 1fr));
@@ -943,18 +942,11 @@ img.np-link:hover { transform: scale(1.06); }
 .folder-quad img:nth-child(4) { left: 54%; top: 54%; }
 .folder:hover .folder-quad, .folder:focus-visible .folder-quad { transform: scale(1.03); background: rgba(255,255,255,0.12); }
 
-/* Stacks: the first record on top, the next two tucked behind, up and to the right */
-.folder-stack { position: absolute; inset: 0; isolation: isolate; }
-.folders-stack .folder-stack { inset: 12px 12px 0 0; }
-.folder-sleeve {
+.folder-single {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06); transition: transform 0.4s var(--ease);
+  box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05); transition: transform 0.35s var(--ease);
 }
-.folder-sleeve-0 { z-index: 3; box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05); }
-.folder-sleeve-1 { z-index: 2; transform: translate(6px, -6px); filter: brightness(0.8); }
-.folder-sleeve-2 { z-index: 1; transform: translate(12px, -12px); filter: brightness(0.6); }
-.folder:hover .folder-sleeve-1, .folder:focus-visible .folder-sleeve-1 { transform: translate(10px, -10px) rotate(2deg); }
-.folder:hover .folder-sleeve-2, .folder:focus-visible .folder-sleeve-2 { transform: translate(18px, -16px) rotate(4deg); }
+.folder:hover .folder-single, .folder:focus-visible .folder-single { transform: scale(1.03); }
 
 /* An open folder: expands over a blurred page, below the album view (50) and the player (40) */
 .folder-backdrop {

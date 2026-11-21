@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import type { ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
-import { Segmented } from './Header';
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -21,21 +20,6 @@ function toFolders(items: ArtItem[]): Folder[] {
   return [...map.values()];
 }
 
-/** Trying out two looks: four covers in a frosted folder (iOS), or the records stacked like a pile. */
-export type FolderStyle = 'grid' | 'stack';
-const STYLE_KEY = 'sleeve.folderStyle';
-const STYLES: { id: FolderStyle; label: string }[] = [
-  { id: 'grid', label: 'Folders' },
-  { id: 'stack', label: 'Stacks' },
-];
-function loadStyle(): FolderStyle {
-  try {
-    return localStorage.getItem(STYLE_KEY) === 'stack' ? 'stack' : 'grid';
-  } catch {
-    return 'grid';
-  }
-}
-
 type Props = {
   items: ArtItem[];
   tileSize: number;
@@ -43,18 +27,9 @@ type Props = {
   onOpenArtist: (a: { id: string; name: string }) => void;
 };
 
-/** "By artist": each artist's records gathered into one folder (or pile) you open to see them all. */
+/** "By artist": each artist's records gathered into an iOS-style folder you open to see them all. */
 export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props) {
   const folders = useMemo(() => toFolders(items), [items]);
-  const [look, setLook] = useState<FolderStyle>(loadStyle);
-  const changeLook = (v: FolderStyle) => {
-    setLook(v);
-    try {
-      localStorage.setItem(STYLE_KEY, v);
-    } catch {
-      /* fine */
-    }
-  };
   const [openId, setOpenId] = useState<string | null>(null);
   const open = folders.find((f) => f.id === openId) ?? null;
 
@@ -78,10 +53,7 @@ export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props
 
   return (
     <>
-      <div className="folders-look">
-        <Segmented small groupId="folderStyle" value={look} options={STYLES} onChange={changeLook} />
-      </div>
-      <ul className={`folders-grid folders-${look}`} style={style}>
+      <ul className="folders-grid" style={style}>
         {folders.map((f, i) => (
           <motion.li
             key={f.id}
@@ -91,12 +63,9 @@ export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props
           >
             <button className="folder" onClick={() => setOpenId(f.id)} aria-label={`${f.name}, ${count(f.items.length)}`}>
               <motion.span className="folder-art">
-                {look === 'stack' || f.items.length === 1 ? (
-                  <span className="folder-stack">
-                    {f.items.slice(0, 3).map((r, k) => (
-                      <img key={r.key} className={`folder-sleeve folder-sleeve-${k}`} src={r.thumb} alt="" loading="lazy" draggable={false} />
-                    ))}
-                  </span>
+                {f.items.length === 1 ? (
+                  // One record: just the record, like a lone app on the home screen.
+                  <img className="folder-single" src={f.items[0].thumb} alt="" loading="lazy" draggable={false} />
                 ) : (
                   <span className="folder-quad">
                     {f.items.slice(0, 4).map((r) => (
