@@ -215,7 +215,7 @@ function AfterRecordSlot({
           ▶
         </button>
         {onDeck ? (
-          <button className="np-after-btn" onClick={() => setOnDeck(null)} title="Take off deck" aria-label="Take off deck">
+          <button className="np-after-btn np-after-remove" onClick={() => setOnDeck(null)} title="Take off deck" aria-label="Take off deck">
             ×
           </button>
         ) : (

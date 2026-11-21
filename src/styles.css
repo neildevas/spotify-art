@@ -564,7 +564,10 @@ img.np-link:hover { transform: scale(1.06); }
 @media (max-width: 760px) {
   .now-playing { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
   .np-progress { grid-column: 1 / -1; grid-row: 2; }
-  .np-volume, .np-divider, .np-after { display: none; }
+  .np-volume, .np-divider { display: none; }
+  /* Small screens: the on-deck slot gets its own row under the progress bar */
+  .np-after { grid-column: 1 / -1; grid-row: 3; max-width: none; }
+  .player-toast { bottom: 168px; } /* clear the taller two-row player */
 }
 
 /* ---------- Artists: type only, no photos ---------- */
@@ -866,10 +869,9 @@ img.np-link:hover { transform: scale(1.06); }
 .np-after-btn:hover { color: var(--fg); background: rgba(255,255,255,0.14); }
 .np-after-play { font-size: 10px; color: #07140b; background: var(--accent); }
 .np-after-play:hover { color: #07140b; background: #3be477; }
-.btn-deck .when-hover { display: none; }
-.btn-deck.is-on { background: rgba(255,255,255,0.12); }
-.btn-deck.is-on:hover .when-idle { display: none; }
-.btn-deck.is-on:hover .when-hover { display: inline; }
+.deck-state { display: inline-flex; align-items: center; gap: 10px; }
+.deck-badge { font-size: 14px; font-weight: 600; color: var(--fg); padding: 0 4px; }
+.np-after-remove { color: var(--fg); background: rgba(255,255,255,0.12); }
 
 /* ---------- Records: artist dividers and arranging ---------- */
 .grid-ordered { grid-auto-flow: row; } /* keep the exact order (no back-filling gaps) */

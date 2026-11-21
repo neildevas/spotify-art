@@ -241,28 +241,33 @@ function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) 
   // Nothing to follow, or it's the record that's already on: just use Play.
   if (needsReconnect || !nowPlaying || nowPlaying.albumId === record.id) return null;
   const isOnDeck = onDeck?.id === record.id;
+  if (isOnDeck) {
+    // Already on deck: say so, with a plain button to take it off (no hover needed).
+    return (
+      <span className="deck-state">
+        <span className="deck-badge">✓ On deck</span>
+        <button
+          className="btn-ghost"
+          onClick={() => {
+            setOnDeck(null);
+            notify(`Took “${record.name}” off deck`);
+          }}
+        >
+          Take off deck
+        </button>
+      </span>
+    );
+  }
   return (
     <button
-      className={`btn-ghost btn-deck ${isOnDeck ? 'is-on' : ''}`}
+      className="btn-ghost"
       onClick={() => {
-        if (isOnDeck) {
-          setOnDeck(null);
-          notify(`Took “${record.name}” off deck`);
-          return;
-        }
         notify(onDeck ? `On deck: “${record.name}” (replaces “${onDeck.name}”)` : `On deck: “${record.name}”`);
         setOnDeck(record);
       }}
-      title={isOnDeck ? 'Take off deck' : 'Keep this record in the player as what to play next'}
+      title="Keep this record in the player as what to play next"
     >
-      {isOnDeck ? (
-        <>
-          <span className="when-idle">✓ On deck</span>
-          <span className="when-hover">Take off deck</span>
-        </>
-      ) : (
-        '＋ On deck'
-      )}
+      ＋ On deck
     </button>
   );
 }
