@@ -28,6 +28,8 @@ const MODE_KEY = 'sleeve.afterRecord';
 const PLAYED_KEY = 'sleeve.lastPlayed';
 // A play you just asked for isn't a record ending (e.g. starting another record on the last song).
 const OWN_REQUEST_GRACE_MS = 5000;
+// Start the next record this long before the last song's end, to beat Spotify's Autoplay to it.
+const END_LEAD_MS = 350;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -124,10 +126,35 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const crateActive = endMode === 'crate' && !onDeck && skippedFor !== currentId;
   const upNext = onDeck ?? (crateActive ? cratePick : null);
 
-  // Watch for the record finishing: we were on its last song, playing, and then it stopped at the
-  // start, or Spotify moved on to something else by itself (its autoplay).
   const prev = useRef<NowPlaying | null>(null);
   const handled = useRef<string | null>(null);
+
+  const startNext = useCallback(
+    (key: string) => {
+      if (handled.current === key || !upNext) return false;
+      handled.current = key;
+      const next = upNext;
+      if (onDeck) setOnDeck(null);
+      setRerollToken(0);
+      playAlbum(next.id, 0);
+      return true;
+    },
+    [upNext, onDeck, setOnDeck, playAlbum],
+  );
+
+  // On the last song with something up next: start it right as the song ends, so Spotify's own
+  // Autoplay doesn't get in first. Re-timed on every update (pause, seek, skip).
+  useEffect(() => {
+    const np = nowPlaying;
+    if (!np || !np.fromAlbum || !np.isLast || np.paused || !upNext) return;
+    const remaining = np.duration - (np.position + (Date.now() - np.measuredAt));
+    const key = `${np.albumId}:${np.trackId}`;
+    const t = setTimeout(() => startNext(key), Math.max(0, remaining - END_LEAD_MS));
+    return () => clearTimeout(t);
+  }, [nowPlaying, upNext, startNext]);
+
+  // Backstop: we were on the last song, playing, and then it stopped at the start or Spotify moved on
+  // to something else by itself (its Autoplay).
   useEffect(() => {
     const p = prev.current;
     prev.current = nowPlaying;
@@ -138,16 +165,13 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
     if (Date.now() - lastPlayRequestAt() < OWN_REQUEST_GRACE_MS) return; // you started something yourself
     const key = `${p.albumId}:${p.trackId}`;
     if (handled.current === key) return;
-    handled.current = key;
-    if (!upNext) {
-      // Stop means stop, even if Spotify would carry on with its own suggestions.
-      if (movedOn) player.toggle();
+    if (upNext) {
+      startNext(key);
       return;
     }
-    const next = upNext;
-    if (onDeck) setOnDeck(null);
-    setRerollToken(0);
-    playAlbum(next.id, 0);
+    handled.current = key;
+    // Stop means stop, even if Spotify would carry on with its own suggestions.
+    if (movedOn && !nowPlaying.paused) player.toggle();
   }, [nowPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const api = useMemo<AfterRecordApi>(

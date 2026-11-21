@@ -22,7 +22,7 @@ export type NowPlaying = {
   measuredAt: number;
   /** Playing a whole record (album context), not a list of songs. */
   fromAlbum: boolean;
-  /** Nothing comes after this song in what's playing: the record's last song. */
+  /** The record's last song: nothing from this album comes next (Spotify may still line up its own suggestions). */
   isLast: boolean;
 };
 
@@ -95,7 +95,9 @@ function toNowPlaying(s: Spotify.PlaybackState): NowPlaying {
     duration: s.duration,
     measuredAt: Date.now(),
     fromAlbum: !!s.context.uri?.startsWith('spotify:album:'),
-    isLast: s.track_window.next_tracks.length === 0,
+    // With Autoplay on, Spotify lists its own picks as "next" after an album's final song, so look for
+    // more songs from this album rather than an empty list.
+    isLast: !s.track_window.next_tracks.some((n) => n.album?.uri && n.album.uri === t.album.uri),
   };
 }
 
