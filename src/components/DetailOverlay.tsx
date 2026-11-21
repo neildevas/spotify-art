@@ -4,7 +4,6 @@ import { useAlbumTracks } from '../hooks/useAlbumTracks';
 import { PlayButton } from '../player/PlayButton';
 import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
-import { SAVE_COPY, useAfterRecord } from '../player/AfterRecord';
 import { savedArtists, useSavedArtist } from '../collection/store';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
@@ -190,7 +189,6 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
             ) : null,
             <div className="overlay-actions" key="l">
               {isPlayable(item) && <PlayButton albumId={item.albumId!} variant="large" />}
-              {isPlayable(item) && item.record && <SaveForNextButton record={item.record} />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗
@@ -231,41 +229,5 @@ export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: numb
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-
-/** Save this record as a reminder to play next. It waits in the player ("Next?") until you play it. */
-function SaveForNextButton({ record }: { record: NonNullable<ArtItem['record']> }) {
-  const { nowPlaying, notify } = usePlayer();
-  const { saved, setSaved } = useAfterRecord();
-  // It's the record that's on: nothing to remember.
-  if (nowPlaying?.albumId === record.id) return null;
-  if (saved?.id === record.id) {
-    return (
-      <span className="deck-state">
-        <span className="deck-badge">✓ {SAVE_COPY.saved}</span>
-        <button
-          className="btn-ghost"
-          onClick={() => {
-            setSaved(null);
-            notify(SAVE_COPY.removed(record.name));
-          }}
-        >
-          {SAVE_COPY.remove}
-        </button>
-      </span>
-    );
-  }
-  return (
-    <button
-      className="btn-ghost"
-      onClick={() => {
-        notify(saved ? SAVE_COPY.replaced(record.name, saved.name) : SAVE_COPY.toast(record.name));
-        setSaved(record);
-      }}
-      title="A reminder in the player of what to play next. It won’t play by itself."
-    >
-      {SAVE_COPY.action}
-    </button>
   );
 }
