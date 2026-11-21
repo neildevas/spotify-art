@@ -38,8 +38,6 @@ type PlayerApi = {
   playAlbum: (albumId: string, trackIndex?: number) => Promise<void>;
   /** Play a list of songs in order, starting at `index`. */
   playTracks: (trackIds: string[], index?: number) => Promise<void>;
-  /** When Sleeve last asked Spotify to play something (to tell a record ending from you starting another). */
-  lastPlayRequestAt: () => number;
   /** A short, friendly confirmation that clears itself. */
   notice: string | null;
   notify: (message: string) => void;
@@ -112,7 +110,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const t = setTimeout(() => setNotice(null), 2800);
     return () => clearTimeout(t);
   }, [notice]);
-  const lastRequest = useRef(0);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [volume, setVolumeState] = useState(() => {
     const v = Number(localStorage.getItem(VOLUME_KEY));
@@ -175,7 +172,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // Browsers only allow audio after a user gesture; this must run before any await.
       player.current?.activateElement();
       setError(null);
-      lastRequest.current = Date.now();
       try {
         const deviceId = await ensureDevice();
         player.current?.activateElement();
@@ -198,7 +194,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       player.current?.activateElement();
       setError(null);
-      lastRequest.current = Date.now();
       try {
         const deviceId = await ensureDevice();
         player.current?.activateElement();
@@ -220,7 +215,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       volume,
       playAlbum,
       playTracks,
-      lastPlayRequestAt: () => lastRequest.current,
       notice,
       notify: setNotice,
       toggle: () => player.current?.togglePlay(),

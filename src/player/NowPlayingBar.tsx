@@ -1,8 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { login } from '../spotify/auth';
-import { Segmented } from '../components/Header';
-import { type EndMode, useAfterRecord } from './AfterRecord';
+import { useAfterRecord } from './AfterRecord';
 import { usePlayer } from './PlayerContext';
 
 const fmt = (ms: number) => {
@@ -187,12 +186,7 @@ function Bar({
   );
 }
 
-const END_MODES: { id: EndMode; label: string }[] = [
-  { id: 'spotify', label: 'Spotify’s picks' },
-  { id: 'crate', label: 'From the crate' },
-];
-
-/** The player's one slot for what comes after this record: on deck, a crate pick, or the choice. */
+/** The player's slot for what to put on next: your on-deck record, or a suggestion from your crate. */
 function AfterRecordSlot({
   lastSong,
   onOpenAlbum,
@@ -200,42 +194,34 @@ function AfterRecordSlot({
   lastSong: boolean;
   onOpenAlbum?: (albumId: string, trackId: string | null) => void;
 }) {
-  const { onDeck, setOnDeck, endMode, setEndMode, cratePick, reroll, skipCrate } = useAfterRecord();
+  const { playAlbum } = usePlayer();
+  const { onDeck, setOnDeck, cratePick, reroll } = useAfterRecord();
   const shown = onDeck ?? cratePick;
-  const label = lastSong ? 'Up next' : onDeck ? 'On deck' : 'From the crate';
+  if (!shown) return null;
+  const label = onDeck ? (lastSong ? 'Up next' : 'On deck') : 'From your crate';
 
   return (
     <>
       <span className="np-divider" aria-hidden />
       <div className="np-after">
-        {shown ? (
-          <>
-            <button className="np-after-record" onClick={() => onOpenAlbum?.(shown.id, null)} title={`Open ${shown.name}`}>
-              {shown.thumb ? <img src={shown.thumb} alt="" /> : <span className="np-after-cover" />}
-              <span className="np-after-text">
-                <span className={`np-after-label ${lastSong ? 'is-soon' : ''}`}>{label}</span>
-                <span className="np-after-title">{shown.name}</span>
-              </span>
-            </button>
-            {!onDeck && (
-              <button className="np-after-btn" onClick={reroll} title="Pick another record" aria-label="Pick another record">
-                ↻
-              </button>
-            )}
-            <button
-              className="np-after-btn"
-              onClick={() => (onDeck ? setOnDeck(null) : skipCrate())}
-              title={onDeck ? 'Take off deck' : 'Not this time'}
-              aria-label={onDeck ? 'Take off deck' : 'Skip the crate pick for this record'}
-            >
-              ×
-            </button>
-          </>
+        <button className="np-after-record" onClick={() => onOpenAlbum?.(shown.id, null)} title={`Open ${shown.name}`}>
+          {shown.thumb ? <img src={shown.thumb} alt="" /> : <span className="np-after-cover" />}
+          <span className="np-after-text">
+            <span className={`np-after-label ${onDeck && lastSong ? 'is-soon' : ''}`}>{label}</span>
+            <span className="np-after-title">{shown.name}</span>
+          </span>
+        </button>
+        <button className="np-after-btn np-after-play" onClick={() => playAlbum(shown.id, 0)} title={`Play ${shown.name} now`} aria-label={`Play ${shown.name} now`}>
+          ▶
+        </button>
+        {onDeck ? (
+          <button className="np-after-btn" onClick={() => setOnDeck(null)} title="Take off deck" aria-label="Take off deck">
+            ×
+          </button>
         ) : (
-          <div className="np-after-choice">
-            <span className="np-after-label">After this record</span>
-            <Segmented small groupId="endMode" value={endMode} options={END_MODES} onChange={setEndMode} />
-          </div>
+          <button className="np-after-btn" onClick={reroll} title="Suggest another record" aria-label="Suggest another record">
+            ↻
+          </button>
         )}
       </div>
     </>

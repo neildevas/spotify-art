@@ -234,7 +234,7 @@ export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: numb
   );
 }
 
-/** Put this record on deck: it plays when the current record finishes. One slot, so it replaces any other. */
+/** Put this record on deck: a reminder in the player of what to play next. One slot, so it replaces any other. */
 function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) {
   const { nowPlaying, needsReconnect, notify } = usePlayer();
   const { onDeck, setOnDeck } = useAfterRecord();
@@ -250,14 +250,10 @@ function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) 
           notify(`Took “${record.name}” off deck`);
           return;
         }
-        notify(
-          onDeck
-            ? `On deck: “${record.name}” (replaces “${onDeck.name}”)`
-            : `On deck: “${record.name}” plays after this record`,
-        );
+        notify(onDeck ? `On deck: “${record.name}” (replaces “${onDeck.name}”)` : `On deck: “${record.name}”`);
         setOnDeck(record);
       }}
-      title={isOnDeck ? 'Take off deck' : 'Play this record after the one that’s on'}
+      title={isOnDeck ? 'Take off deck' : 'Keep this record in the player as what to play next'}
     >
       {isOnDeck ? (
         <>
@@ -265,7 +261,7 @@ function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) 
           <span className="when-hover">Take off deck</span>
         </>
       ) : (
-        '⤓ Play next'
+        '＋ On deck'
       )}
     </button>
   );

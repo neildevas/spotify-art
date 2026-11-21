@@ -864,7 +864,8 @@ img.np-link:hover { transform: scale(1.06); }
 .np-after-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-after-btn { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: var(--fg-dim); background: rgba(255,255,255,0.06); }
 .np-after-btn:hover { color: var(--fg); background: rgba(255,255,255,0.14); }
-.np-after-choice { display: flex; flex-direction: column; gap: 4px; }
+.np-after-play { font-size: 10px; color: #07140b; background: var(--accent); }
+.np-after-play:hover { color: #07140b; background: #3be477; }
 .btn-deck .when-hover { display: none; }
 .btn-deck.is-on { background: rgba(255,255,255,0.12); }
 .btn-deck.is-on:hover .when-idle { display: none; }
