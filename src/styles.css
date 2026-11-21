@@ -912,43 +912,43 @@ img.np-link:hover { transform: scale(1.06); }
 .btn-suggest.is-on:hover .when-idle { display: none; }
 .btn-suggest.is-on:hover .when-hover { display: inline; }
 
-/* ---------- Records by artist: folders (artist photo in front, their records peeking out behind) ---------- */
+/* ---------- Records by artist: folders (four covers, iOS-style) or stacks (a pile of sleeves) ---------- */
+.folders-look { display: flex; justify-content: flex-end; margin: -8px 0 18px; }
 .folders-grid {
   list-style: none; margin: 0; padding: 0; display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(var(--tile, 180px), 40vw), 1fr));
   column-gap: clamp(18px, 2vw, 30px); row-gap: clamp(22px, 2.4vw, 34px);
 }
 .folder { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; color: var(--fg); }
-.folder-stack { position: relative; display: block; aspect-ratio: 1; margin: 12px 12px 0 0; isolation: isolate; }
-.folder-front, .folder-peek { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 6px; }
-.folder-peek {
-  object-fit: cover; display: block; z-index: -1;
+.folder-art { position: relative; display: block; aspect-ratio: 1; }
+.folder-caption { display: flex; flex-direction: column; gap: 2px; }
+.folder-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-meta { font-size: 12px; color: var(--fg-faint); }
+.folder:focus-visible { outline: none; }
+.folder:focus-visible .folder-name { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Folders: a frosted tile with up to four covers */
+.folder-quad {
+  position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8%;
+  padding: 9%; box-sizing: border-box; border-radius: 18%/18%;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.35s var(--ease), background 0.35s var(--ease);
+}
+.folder-quad img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; min-height: 0; }
+.folder:hover .folder-quad, .folder:focus-visible .folder-quad { transform: scale(1.03); background: rgba(255,255,255,0.12); }
+
+/* Stacks: the first record on top, the next two tucked behind, up and to the right */
+.folder-stack { position: absolute; inset: 0; isolation: isolate; }
+.folders-stack .folder-stack { inset: 12px 12px 0 0; }
+.folder-sleeve {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.06); transition: transform 0.4s var(--ease);
 }
-.folder-peek-1 { transform: translate(6px, -6px); }
-.folder-peek-2 { transform: translate(12px, -12px); z-index: -2; filter: brightness(0.75); }
-.folder-front {
-  display: grid; place-items: end start; overflow: hidden; background: var(--bg-raised);
-  box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
-  transition: box-shadow 0.4s var(--ease);
-}
-.folder-front img, .folder-head-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.folder-front::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.65)); }
-.folder-photo-fallback { filter: brightness(0.45) saturate(0.6) blur(2px); transform: scale(1.06); }
-.folder-initial {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  font-family: var(--serif); font-size: 56px; color: rgba(243,241,236,0.8);
-}
-.folder-name {
-  position: relative; z-index: 1; padding: 12px; font-family: var(--serif); line-height: 1.02;
-  font-size: clamp(17px, calc(var(--tile, 180px) * 0.12), 28px); text-shadow: 0 1px 12px rgba(0,0,0,0.5);
-}
-.folder-meta { font-size: 12px; color: var(--fg-faint); }
-.folder:hover .folder-peek-1, .folder:focus-visible .folder-peek-1 { transform: translate(10px, -10px) rotate(2deg); }
-.folder:hover .folder-peek-2, .folder:focus-visible .folder-peek-2 { transform: translate(18px, -16px) rotate(4deg); }
-.folder:hover .folder-front, .folder:focus-visible .folder-front { box-shadow: 0 44px 80px -30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.1); }
-.folder:focus-visible { outline: none; }
-.folder:focus-visible .folder-meta { color: var(--fg); }
+.folder-sleeve-0 { z-index: 3; box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05); }
+.folder-sleeve-1 { z-index: 2; transform: translate(6px, -6px); filter: brightness(0.8); }
+.folder-sleeve-2 { z-index: 1; transform: translate(12px, -12px); filter: brightness(0.6); }
+.folder:hover .folder-sleeve-1, .folder:focus-visible .folder-sleeve-1 { transform: translate(10px, -10px) rotate(2deg); }
+.folder:hover .folder-sleeve-2, .folder:focus-visible .folder-sleeve-2 { transform: translate(18px, -16px) rotate(4deg); }
 
 /* An open folder: expands over a blurred page, below the album view (50) and the player (40) */
 .folder-backdrop {
@@ -962,10 +962,6 @@ img.np-link:hover { transform: scale(1.06); }
   box-shadow: 0 60px 120px -40px rgba(0,0,0,0.9);
 }
 .folder-head { display: flex; align-items: center; gap: 18px; }
-.folder-head-photo {
-  position: relative; flex: none; width: 72px; height: 72px; border-radius: 6px; overflow: hidden; background: var(--bg-raised);
-}
-.folder-head-photo .folder-initial { font-size: 30px; }
 .folder-head-text { display: flex; flex-direction: column; gap: 4px; margin-right: auto; min-width: 0; }
 .folder-head-text h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 4vw, 40px); line-height: 1; }
 .folder-head-text span { font-size: 13px; color: var(--fg-dim); }
@@ -977,7 +973,6 @@ img.np-link:hover { transform: scale(1.06); }
   .folder-panel { padding: 18px; border-radius: 20px; max-height: 72vh; }
   .folder-panel { position: relative; }
   .folder-head { flex-wrap: wrap; gap: 12px; padding-right: 32px; }
-  .folder-head-photo { width: 56px; height: 56px; }
   .folder-close { position: absolute; top: 12px; right: 12px; }
   .folder-records .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 }

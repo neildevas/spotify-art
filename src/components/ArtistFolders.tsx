@@ -1,12 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { useSavedArtists } from '../collection/store';
-import { RateLimitError, getArtist, pickImageSet } from '../spotify/api';
 import type { ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
+import { Segmented } from './Header';
 
 const ease = [0.22, 1, 0.36, 1] as const;
-const spring = { type: 'spring', stiffness: 320, damping: 34 } as const;
 
 type Folder = { id: string; name: string; items: ArtItem[] };
 
@@ -23,56 +21,19 @@ function toFolders(items: ArtItem[]): Folder[] {
   return [...map.values()];
 }
 
-// --- artist photos: saved artists have one; everyone else is looked up once and remembered ---
-
-const PHOTOS_KEY = 'sleeve.artistPhotos';
-function loadPhotos(): Record<string, string> {
+/** Trying out two looks: four covers in a frosted folder (iOS), or the records stacked like a pile. */
+export type FolderStyle = 'grid' | 'stack';
+const STYLE_KEY = 'sleeve.folderStyle';
+const STYLES: { id: FolderStyle; label: string }[] = [
+  { id: 'grid', label: 'Folders' },
+  { id: 'stack', label: 'Stacks' },
+];
+function loadStyle(): FolderStyle {
   try {
-    return JSON.parse(localStorage.getItem(PHOTOS_KEY) ?? '{}') ?? {};
+    return localStorage.getItem(STYLE_KEY) === 'stack' ? 'stack' : 'grid';
   } catch {
-    return {};
+    return 'grid';
   }
-}
-let photoCache = loadPhotos();
-function remember(id: string, url: string) {
-  photoCache = { ...photoCache, [id]: url };
-  try {
-    localStorage.setItem(PHOTOS_KEY, JSON.stringify(photoCache));
-  } catch {
-    /* fine: memory still has it */
-  }
-}
-
-function useArtistPhotos(ids: string[]) {
-  const saved = useSavedArtists();
-  const [photos, setPhotos] = useState(photoCache);
-  const fromSaved = useMemo(() => new Map(saved.filter((a) => a.image).map((a) => [a.id, a.image!])), [saved]);
-  const missing = ids.filter((id) => !id.startsWith('name:') && !fromSaved.has(id) && photos[id] === undefined);
-  const key = missing.join();
-
-  useEffect(() => {
-    if (!missing.length) return;
-    let cancelled = false;
-    (async () => {
-      for (const id of missing) {
-        if (cancelled) return;
-        try {
-          const full = await getArtist(id);
-          const { thumb, image } = pickImageSet(full.images);
-          remember(id, image || thumb || '');
-          if (!cancelled) setPhotos(photoCache);
-        } catch (e) {
-          if (e instanceof RateLimitError) return; // try again another time
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  return (id: string) => fromSaved.get(id) || photos[id] || '';
 }
 
 type Props = {
@@ -82,10 +43,18 @@ type Props = {
   onOpenArtist: (a: { id: string; name: string }) => void;
 };
 
-/** "By artist": each artist is a folder with their photo on the front and their records tucked behind it. */
+/** "By artist": each artist's records gathered into one folder (or pile) you open to see them all. */
 export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props) {
   const folders = useMemo(() => toFolders(items), [items]);
-  const photo = useArtistPhotos(folders.map((f) => f.id));
+  const [look, setLook] = useState<FolderStyle>(loadStyle);
+  const changeLook = (v: FolderStyle) => {
+    setLook(v);
+    try {
+      localStorage.setItem(STYLE_KEY, v);
+    } catch {
+      /* fine */
+    }
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   const open = folders.find((f) => f.id === openId) ?? null;
 
@@ -109,32 +78,40 @@ export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props
 
   return (
     <>
-      <ul className="folders-grid" style={style}>
-        {folders.map((f, i) => {
-          const src = photo(f.id);
-          const peeks = f.items.slice(0, Math.min(f.items.length - 1, 2));
-          return (
-            <motion.li
-              key={f.id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease, delay: Math.min(i, 15) * 0.03 }}
-            >
-              <button className="folder" onClick={() => setOpenId(f.id)} aria-label={`${f.name}, ${count(f.items.length)}`}>
-                <span className="folder-stack">
-                  {peeks.map((r, k) => (
-                    <img key={r.key} className={`folder-peek folder-peek-${k + 1}`} src={r.thumb} alt="" loading="lazy" draggable={false} />
-                  ))}
-                  <motion.span className="folder-front" layoutId={`folder-${f.id}`} transition={spring}>
-                    <FolderPhoto src={src} fallback={f.items[0]?.thumb} name={f.name} />
-                    <span className="folder-name">{f.name}</span>
-                  </motion.span>
-                </span>
+      <div className="folders-look">
+        <Segmented small groupId="folderStyle" value={look} options={STYLES} onChange={changeLook} />
+      </div>
+      <ul className={`folders-grid folders-${look}`} style={style}>
+        {folders.map((f, i) => (
+          <motion.li
+            key={f.id}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease, delay: Math.min(i, 15) * 0.03 }}
+          >
+            <button className="folder" onClick={() => setOpenId(f.id)} aria-label={`${f.name}, ${count(f.items.length)}`}>
+              <motion.span className="folder-art">
+                {look === 'stack' || f.items.length === 1 ? (
+                  <span className="folder-stack">
+                    {f.items.slice(0, 3).map((r, k) => (
+                      <img key={r.key} className={`folder-sleeve folder-sleeve-${k}`} src={r.thumb} alt="" loading="lazy" draggable={false} />
+                    ))}
+                  </span>
+                ) : (
+                  <span className="folder-quad">
+                    {f.items.slice(0, 4).map((r) => (
+                      <img key={r.key} src={r.thumb} alt="" loading="lazy" draggable={false} />
+                    ))}
+                  </span>
+                )}
+              </motion.span>
+              <span className="folder-caption">
+                <span className="folder-name">{f.name}</span>
                 <span className="folder-meta">{count(f.items.length)}</span>
-              </button>
-            </motion.li>
-          );
-        })}
+              </span>
+            </button>
+          </motion.li>
+        ))}
       </ul>
 
       <AnimatePresence>
@@ -159,9 +136,6 @@ export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props
               onClick={(e) => e.stopPropagation()}
             >
               <div className="folder-head">
-                <motion.span className="folder-head-photo" layoutId={`folder-${open.id}`} transition={spring}>
-                  <FolderPhoto src={photo(open.id)} fallback={open.items[0]?.thumb} name={open.name} />
-                </motion.span>
                 <div className="folder-head-text">
                   <h2>{open.name}</h2>
                   <span>{count(open.items.length)} in your collection</span>
@@ -182,17 +156,6 @@ export function ArtistFolders({ items, tileSize, onSelect, onOpenArtist }: Props
           </motion.div>
         )}
       </AnimatePresence>
-    </>
-  );
-}
-
-function FolderPhoto({ src, fallback, name }: { src: string; fallback?: string; name: string }) {
-  if (src) return <img src={src} alt="" loading="lazy" draggable={false} />;
-  // No photo (yet): their first record, dimmed, with an initial.
-  return (
-    <>
-      {fallback && <img className="folder-photo-fallback" src={fallback} alt="" draggable={false} />}
-      <span className="folder-initial">{name[0]}</span>
     </>
   );
 }
