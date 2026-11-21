@@ -927,18 +927,20 @@ img.np-link:hover { transform: scale(1.06); }
 .folder:focus-visible { outline: none; }
 .folder:focus-visible .folder-name { text-decoration: underline; text-underline-offset: 3px; }
 
-/* Folders: a frosted tile with up to four covers */
+/* Folders: a frosted tile with up to four covers. Cells are placed absolutely (not with CSS grid):
+   Safari sizes grid rows from the images' own size, which pushed covers out of the folder. */
 .folder-quad {
-  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8%; overflow: hidden;
-  padding: 9%; box-sizing: border-box; border-radius: 18%/18%;
+  position: absolute; inset: 0; overflow: hidden; border-radius: 18%;
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08);
   transition: transform 0.35s var(--ease), background 0.35s var(--ease);
 }
-/* Safari sizes grid rows from the images' own size unless the cells are pinned square */
 .folder-quad img {
-  width: 100%; height: 100%; min-width: 0; min-height: 0; max-height: 100%; aspect-ratio: 1;
-  object-fit: cover; border-radius: 4px; display: block;
+  position: absolute; width: 37%; height: 37%; object-fit: cover; border-radius: 4px; display: block;
 }
+.folder-quad img:nth-child(1) { left: 9%; top: 9%; }
+.folder-quad img:nth-child(2) { left: 54%; top: 9%; }
+.folder-quad img:nth-child(3) { left: 9%; top: 54%; }
+.folder-quad img:nth-child(4) { left: 54%; top: 54%; }
 .folder:hover .folder-quad, .folder:focus-visible .folder-quad { transform: scale(1.03); background: rgba(255,255,255,0.12); }
 
 /* Stacks: the first record on top, the next two tucked behind, up and to the right */
