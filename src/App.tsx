@@ -274,8 +274,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   );
   const close = useCallback(() => setSelected(null), []);
 
-  /** Clicking the player's cover or title opens the album that's playing, on the song that's playing. */
-  const openPlayingAlbum = useCallback(
+  /** Open a record's album view by id (from the player, a suggestion or a favourite track), on a song if given. */
+  const openAlbum = useCallback(
     (albumId: string, trackId: string | null) => {
       const onPage = items.find((x) => x.albumId === albumId && isPlayable(x));
       const show = (item: ArtItem) => setSelected({ ...item, highlightTrackId: trackId ?? undefined });
@@ -330,6 +330,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               albums={artistAlbums}
               tileSize={tileSize}
               onSelect={setSelected}
+              onOpenAlbum={openAlbum}
               backLabel="Collection"
             />
           ) : view === 'collection' ? (
@@ -381,6 +382,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               albums={artistAlbums}
               tileSize={tileSize}
               onSelect={setSelected}
+              onOpenAlbum={openAlbum}
             />
           ) : (
             <>
@@ -422,7 +424,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         <AnimatePresence>
           {selected && <DetailOverlay key="overlay" item={selected} onClose={close} onStep={step} onArtist={openArtist} />}
         </AnimatePresence>
-        <NowPlayingBar onOpenAlbum={openPlayingAlbum} />
+        <NowPlayingBar onOpenAlbum={openAlbum} />
       </LayoutGroup>
     </LayoutModeContext.Provider>
   );

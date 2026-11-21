@@ -47,6 +47,8 @@ type Props = {
   albums: { items: ArtItem[]; loading: boolean; error: Error | null; hasMore: boolean; loadMore: () => void };
   tileSize: number;
   onSelect: (item: ArtItem) => void;
+  /** Open a record's album view by id (favourite tracks), on that song. */
+  onOpenAlbum?: (albumId: string, trackId: string | null) => void;
   /** Where the artist page's back link goes ("Search" or "Collection"). */
   backLabel?: string;
 };
@@ -271,6 +273,7 @@ function ArtistPage({
   albums,
   tileSize,
   onSelect,
+  onOpenAlbum,
   backLabel = 'Search',
 }: Props & { artist: Artist }) {
   // Collected artists also get favourite tracks; everyone gets your records by them, then the discography.
@@ -326,7 +329,7 @@ function ArtistPage({
             <SaveArtistButton artist={artist} />
             {!saved && <span className="liner-hint">Add them to keep their card in your collection and heart favourite tracks.</span>}
           </div>
-          {saved && <FavTracks artist={saved} />}
+          {saved && <FavTracks artist={saved} onOpenRecord={onOpenAlbum} />}
         </div>
       </header>
 

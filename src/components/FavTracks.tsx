@@ -4,16 +4,18 @@ import { usePlayer } from '../player/PlayerContext';
 import type { FavTrack } from '../spotify/types';
 import { HeartIcon } from './DetailOverlay';
 
-type Props = { artist: SavedArtist };
+type Props = {
+  artist: SavedArtist;
+  /** Open the song's record in the album view (songs don't play on their own). */
+  onOpenRecord?: (albumId: string, trackId: string | null) => void;
+};
 
 const EMPTY_HINT = 'Open any album and tap ♡ next to a song to keep it here.';
 
-/** Songs you hearted for this artist, as a setlist in the hero beside their portrait. */
-export function FavTracks({ artist }: Props) {
+/** Songs you hearted for this artist, as a setlist in the hero. Clicking one opens its record. */
+export function FavTracks({ artist, onOpenRecord }: Props) {
   const favs = artist.favTracks ?? [];
   const player = usePlayer();
-  const ids = favs.map((t) => t.id);
-  const play = (i: number) => player.playTracks(ids, i);
   const playingId = player.nowPlaying?.trackId;
 
   const rank = (t: FavTrack, i: number) =>
@@ -45,13 +47,6 @@ export function FavTracks({ artist }: Props) {
     <div className="fav-setlist">
       <div className="fav-setlist-head">
         <span className="eyebrow">Favourite tracks</span>
-        <div className="fav-setlist-tools">
-          {favs.length > 0 && (
-            <button className="text-btn" onClick={() => play(0)}>
-              ▶ Play all
-            </button>
-          )}
-        </div>
       </div>
       {favs.length ? (
         <ol className="fav-setlist-list">
@@ -60,8 +55,8 @@ export function FavTracks({ artist }: Props) {
               key={t.id}
               layout
               className={t.id === playingId ? 'is-playing' : ''}
-              onClick={() => play(i)}
-              title={`Play ${t.title}`}
+              onClick={() => onOpenRecord?.(t.albumId, t.id)}
+              title={`Open ${t.albumName}`}
             >
               <span className="fav-num">{rank(t, i)}</span>
               {t.thumb ? <img className="fav-thumb" src={t.thumb} alt="" /> : <span className="fav-thumb" />}

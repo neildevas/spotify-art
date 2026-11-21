@@ -164,7 +164,6 @@ export const playAlbum = (deviceId: string, albumId: string, position = 0) =>
     body: { context_uri: `spotify:album:${albumId}`, offset: { position } },
   });
 
-/** Play a list of songs (e.g. an artist's favourites) in order, starting at `position`. */
 export const playTracks = (deviceId: string, trackIds: string[], position = 0) =>
   spotify<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'PUT',

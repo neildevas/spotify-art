@@ -834,15 +834,11 @@ img.np-link:hover { transform: scale(1.06); }
 
 .likes-row.is-playing .likes-title { color: var(--accent); }
 .likes-n { display: grid; }
-.likes-num, .likes-play, .likes-n .eq { grid-area: 1 / 1; }
-.likes-play { opacity: 0; color: var(--fg); font-size: 11px; }
-.likes-row:hover .likes-num { opacity: 0; }
-.likes-row:hover .likes-play { opacity: 1; }
+.likes-num, .likes-n .eq { grid-area: 1 / 1; }
 .likes-cover-btn { padding: 0; border-radius: 4px; transition: transform 0.2s var(--ease); }
 .likes-cover-btn:hover { transform: scale(1.06); }
 .likes-record-link { padding: 0; color: inherit; font: inherit; text-align: left; }
 .likes-record-link:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
-.btn-play-small { height: 34px; padding: 0 16px; border-radius: 999px; background: var(--accent); color: #07140b; font-weight: 600; font-size: 13px; }
 
 .profile { position: relative; }
 .profile-menu {

@@ -19,17 +19,13 @@ type Props = {
 };
 
 const TYPE: Record<string, string> = { album: 'Album', single: 'Single', compilation: 'Compilation' };
-// Spotify takes a list of songs to play; send this many from the clicked one onward.
-const PLAY_AHEAD = 100;
 
 /**
- * Your Spotify liked songs, much like Spotify shows them: play a song or two, then open or add its
+ * Your Spotify liked songs, much like Spotify shows them: click one to open its record, or add the
  * record. A Spotify extra reached from the profile menu, not part of the main tabs.
  */
 export function LikesView({ rows, total, loading, refreshing, error, backLabel, onBack, onOpenRecord, onRefresh }: Props) {
   const player = usePlayer();
-  const ids = rows.map((r) => r.like.trackId);
-  const play = (i: number) => player.playTracks(ids.slice(i, i + PLAY_AHEAD), 0);
   const playingId = player.nowPlaying?.trackId;
 
   return (
@@ -47,11 +43,6 @@ export function LikesView({ rows, total, loading, refreshing, error, backLabel, 
           </span>
         </motion.h1>
         <div className="collection-tools">
-          {rows.length > 0 && (
-            <button className="btn-play-small" onClick={() => play(0)}>
-              ▶ Play
-            </button>
-          )}
           <button className="text-btn" onClick={onRefresh} disabled={loading || refreshing} title="Check Spotify for new likes">
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -79,7 +70,6 @@ export function LikesView({ rows, total, loading, refreshing, error, backLabel, 
               n={i + 1}
               playing={r.like.trackId === playingId}
               paused={!!player.nowPlaying?.paused}
-              onPlay={() => play(i)}
               onOpenRecord={() => onOpenRecord(r.item)}
             />
           ))}
@@ -95,14 +85,12 @@ function LikeItem({
   n,
   playing,
   paused,
-  onPlay,
   onOpenRecord,
 }: {
   row: LikeRow;
   n: number;
   playing: boolean;
   paused: boolean;
-  onPlay: () => void;
   onOpenRecord: () => void;
 }) {
   const { like, item } = row;
@@ -117,9 +105,9 @@ function LikeItem({
       className={`likes-row ${playing ? 'is-playing' : ''}`}
       role="row"
       tabIndex={0}
-      onClick={onPlay}
-      onKeyDown={(e) => e.key === 'Enter' && onPlay()}
-      title={`Play ${like.name}`}
+      onClick={onOpenRecord}
+      onKeyDown={(e) => e.key === 'Enter' && onOpenRecord()}
+      title={`Open ${record.name}`}
     >
       <span className="likes-n">
         {playing && !paused ? (
@@ -131,9 +119,6 @@ function LikeItem({
         ) : (
           <>
             <span className="likes-num">{n}</span>
-            <span className="likes-play" aria-hidden>
-              ▶
-            </span>
           </>
         )}
       </span>
