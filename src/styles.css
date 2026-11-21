@@ -916,3 +916,8 @@ img.np-link:hover { transform: scale(1.06); }
 .grid-arrange .tile { cursor: grab; }
 .grid-arrange .tile:active { cursor: grabbing; }
 .tile-dragging { opacity: 0.35; }
+
+.btn-suggest .when-hover { display: none; }
+.btn-suggest.is-on { background: rgba(255,255,255,0.12); }
+.btn-suggest.is-on:hover .when-idle { display: none; }
+.btn-suggest.is-on:hover .when-hover { display: inline; }

@@ -90,7 +90,8 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
     setCratePick((prev) => {
       const stillThere = prev && prev.id !== currentId && records.some((r) => r.id === prev.id);
       // A record you chose yourself stays put until it's playing (or you ask for another).
-      if (chosen.current && stillThere) return prev;
+      // (It may come from outside your collection, e.g. an artist's discography.)
+      if (chosen.current && prev && prev.id !== currentId) return prev;
       chosen.current = false;
       if (rerollToken === 0 && stillThere) return prev;
       const next = pickFromCrate(records, currentId, lastPlayed.current, seen.current);

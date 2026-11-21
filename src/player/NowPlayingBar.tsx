@@ -202,6 +202,7 @@ const SparkIcon = () => (
 function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
   const { playAlbum } = usePlayer();
   const { cratePick: pick, reroll, choose } = useAfterRecord();
+  const records = useCollection();
   const [open, setOpen] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -253,7 +254,9 @@ function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackI
           >
             <div className="suggest-head">
               <span className="eyebrow">Suggested next</span>
-              <span className="suggest-from">{choosing ? 'choose a record' : 'from your collection'}</span>
+              <span className="suggest-from">
+                {choosing ? 'choose a record' : pick && records.some((r) => r.id === pick.id) ? 'from your collection' : ''}
+              </span>
             </div>
             {choosing ? (
               <RecordPicker

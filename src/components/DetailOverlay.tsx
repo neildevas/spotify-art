@@ -4,6 +4,7 @@ import { useAlbumTracks } from '../hooks/useAlbumTracks';
 import { PlayButton } from '../player/PlayButton';
 import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
+import { useAfterRecord } from '../player/AfterRecord';
 import { savedArtists, useSavedArtist } from '../collection/store';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
@@ -189,6 +190,7 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
             ) : null,
             <div className="overlay-actions" key="l">
               {isPlayable(item) && <PlayButton albumId={item.albumId!} variant="large" />}
+              {isPlayable(item) && item.record && <SuggestNextButton record={item.record} />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗
@@ -231,3 +233,37 @@ export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: numb
     </svg>
   );
 }
+
+/** Make this record the one in the player's Suggest panel (same as choosing it there). */
+function SuggestNextButton({ record }: { record: NonNullable<ArtItem['record']> }) {
+  const { nowPlaying, notify } = usePlayer();
+  const { cratePick, choose, reroll } = useAfterRecord();
+  // The Suggest panel lives in the player, and there's no point suggesting what's already on.
+  if (!nowPlaying || nowPlaying.albumId === record.id) return null;
+  const isSuggested = cratePick?.id === record.id;
+  return (
+    <button
+      className={`btn-ghost btn-suggest ${isSuggested ? 'is-on' : ''}`}
+      onClick={() => {
+        if (isSuggested) {
+          reroll();
+          notify('Back to a random suggestion');
+          return;
+        }
+        choose(record);
+        notify(`“${record.name}” is your suggested next. It’s under Suggest in the player.`);
+      }}
+      title={isSuggested ? 'Swap it for a random suggestion' : 'Put this record in the player’s Suggest panel. It won’t play by itself.'}
+    >
+      {isSuggested ? (
+        <>
+          <span className="when-idle">✓ Suggested next</span>
+          <span className="when-hover">Remove</span>
+        </>
+      ) : (
+        '✦ Suggest next'
+      )}
+    </button>
+  );
+}
+
