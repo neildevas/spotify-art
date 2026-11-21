@@ -195,7 +195,7 @@ function AfterRecordSlot({
   onOpenAlbum?: (albumId: string, trackId: string | null) => void;
 }) {
   const { playAlbum } = usePlayer();
-  const { onDeck, setOnDeck, cratePick, reroll } = useAfterRecord();
+  const { onDeck, setOnDeck, cratePick, reroll, dismissCrate } = useAfterRecord();
   const shown = onDeck ?? cratePick;
   if (!shown) return null;
   const label = onDeck ? (lastSong ? 'Up next' : 'On deck') : 'From your crate';
@@ -214,15 +214,19 @@ function AfterRecordSlot({
         <button className="np-after-btn np-after-play" onClick={() => playAlbum(shown.id, 0)} title={`Play ${shown.name} now`} aria-label={`Play ${shown.name} now`}>
           ▶
         </button>
-        {onDeck ? (
-          <button className="np-after-btn np-after-remove" onClick={() => setOnDeck(null)} title="Take off deck" aria-label="Take off deck">
-            ×
-          </button>
-        ) : (
+        {!onDeck && (
           <button className="np-after-btn" onClick={reroll} title="Suggest another record" aria-label="Suggest another record">
             ↻
           </button>
         )}
+        <button
+          className="np-after-btn np-after-remove"
+          onClick={() => (onDeck ? setOnDeck(null) : dismissCrate())}
+          title={onDeck ? 'Take off deck' : 'Hide this suggestion'}
+          aria-label={onDeck ? 'Take off deck' : 'Hide the crate suggestion'}
+        >
+          ×
+        </button>
       </div>
     </>
   );

@@ -14,6 +14,8 @@ type AfterRecordApi = {
   /** A record from your collection you haven't played in a while (shown when nothing's on deck). */
   cratePick: RecordInfo | null;
   reroll: () => void;
+  /** Hide the crate suggestion until the next record starts. */
+  dismissCrate: () => void;
 };
 
 const DECK_KEY = 'sleeve.onDeck';
@@ -70,6 +72,7 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const [onDeck, setOnDeckState] = useState<RecordInfo | null>(() => readJson(DECK_KEY, null));
   const [cratePick, setCratePick] = useState<RecordInfo | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
+  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   const lastPlayed = useRef<Record<string, number>>(readJson(PLAYED_KEY, {}));
   const seen = useRef<string[]>([]);
 
@@ -104,10 +107,11 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
     () => ({
       onDeck,
       setOnDeck,
-      cratePick: onDeck ? null : cratePick,
+      cratePick: onDeck || (currentId && dismissedFor === currentId) ? null : cratePick,
       reroll: () => setRerollToken((n) => n + 1),
+      dismissCrate: () => setDismissedFor(currentId),
     }),
-    [onDeck, setOnDeck, cratePick],
+    [onDeck, setOnDeck, cratePick, currentId, dismissedFor],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
