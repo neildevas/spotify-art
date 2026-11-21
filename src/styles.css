@@ -929,12 +929,16 @@ img.np-link:hover { transform: scale(1.06); }
 
 /* Folders: a frosted tile with up to four covers */
 .folder-quad {
-  position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8%;
+  position: absolute; inset: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8%; overflow: hidden;
   padding: 9%; box-sizing: border-box; border-radius: 18%/18%;
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08);
   transition: transform 0.35s var(--ease), background 0.35s var(--ease);
 }
-.folder-quad img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; min-height: 0; }
+/* Safari sizes grid rows from the images' own size unless the cells are pinned square */
+.folder-quad img {
+  width: 100%; height: 100%; min-width: 0; min-height: 0; max-height: 100%; aspect-ratio: 1;
+  object-fit: cover; border-radius: 4px; display: block;
+}
 .folder:hover .folder-quad, .folder:focus-visible .folder-quad { transform: scale(1.03); background: rgba(255,255,255,0.12); }
 
 /* Stacks: the first record on top, the next two tucked behind, up and to the right */
