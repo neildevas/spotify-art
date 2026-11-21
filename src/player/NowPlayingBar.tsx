@@ -188,7 +188,7 @@ function Bar({
 }
 
 const END_MODES: { id: EndMode; label: string }[] = [
-  { id: 'stop', label: 'Stop' },
+  { id: 'spotify', label: 'Spotify’s picks' },
   { id: 'crate', label: 'From the crate' },
 ];
 
@@ -233,7 +233,7 @@ function AfterRecordSlot({
           </>
         ) : (
           <div className="np-after-choice">
-            <span className="np-after-label">When this record ends</span>
+            <span className="np-after-label">After this record</span>
             <Segmented small groupId="endMode" value={endMode} options={END_MODES} onChange={setEndMode} />
           </div>
         )}

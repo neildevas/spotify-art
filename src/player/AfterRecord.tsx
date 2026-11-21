@@ -5,9 +5,10 @@ import { type NowPlaying, usePlayer } from './PlayerContext';
 
 /**
  * What plays after the current record. Sleeve only steps in when a record finishes, never between
- * songs: one record "on deck", or (if you choose) one pulled from your crate. No queue to manage.
+ * songs: one record "on deck", or (if you choose) one pulled from your crate. Otherwise Spotify
+ * carries on with its own suggestions (its Autoplay). No queue to manage.
  */
-export type EndMode = 'stop' | 'crate';
+export type EndMode = 'spotify' | 'crate';
 
 type AfterRecordApi = {
   onDeck: RecordInfo | null;
@@ -78,11 +79,10 @@ export function useAfterRecord() {
 }
 
 export function AfterRecordProvider({ children }: { children: React.ReactNode }) {
-  const player = usePlayer();
-  const { nowPlaying, playAlbum, lastPlayRequestAt } = player;
+  const { nowPlaying, playAlbum, lastPlayRequestAt } = usePlayer();
   const records = useCollection();
   const [onDeck, setOnDeckState] = useState<RecordInfo | null>(() => readJson(DECK_KEY, null));
-  const [endMode, setEndModeState] = useState<EndMode>(() => (readJson<string>(MODE_KEY, 'stop') === 'crate' ? 'crate' : 'stop'));
+  const [endMode, setEndModeState] = useState<EndMode>(() => (readJson<string>(MODE_KEY, 'spotify') === 'crate' ? 'crate' : 'spotify'));
   const [cratePick, setCratePick] = useState<RecordInfo | null>(null);
   const [skippedFor, setSkippedFor] = useState<string | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
@@ -165,13 +165,8 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
     if (Date.now() - lastPlayRequestAt() < OWN_REQUEST_GRACE_MS) return; // you started something yourself
     const key = `${p.albumId}:${p.trackId}`;
     if (handled.current === key) return;
-    if (upNext) {
-      startNext(key);
-      return;
-    }
-    handled.current = key;
-    // Stop means stop, even if Spotify would carry on with its own suggestions.
-    if (movedOn && !nowPlaying.paused) player.toggle();
+    // Nothing on deck or from the crate: leave it to Spotify's own suggestions.
+    if (upNext) startNext(key);
   }, [nowPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const api = useMemo<AfterRecordApi>(
