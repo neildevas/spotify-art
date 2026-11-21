@@ -901,14 +901,8 @@ img.np-link:hover { transform: scale(1.06); }
   .suggest-panel { left: 0; right: 0; width: auto; bottom: calc(100% + 12px); }
 }
 
-/* ---------- Records: artist dividers and arranging ---------- */
+/* ---------- Records: arranging ---------- */
 .grid-ordered { grid-auto-flow: row; } /* keep the exact order (no back-filling gaps) */
-.grid-divider {
-  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px;
-  padding: 18px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px;
-}
-.grid-divider:first-child { padding-top: 0; }
-.grid-divider-name { font-family: var(--serif); font-size: clamp(22px, calc(var(--tile, 180px) * 0.15), 34px); line-height: 1.1; color: var(--fg); }
 .grid-arrange .tile { cursor: grab; }
 .grid-arrange .tile:active { cursor: grabbing; }
 .tile-dragging { opacity: 0.35; }
@@ -917,3 +911,66 @@ img.np-link:hover { transform: scale(1.06); }
 .btn-suggest.is-on { background: rgba(255,255,255,0.12); }
 .btn-suggest.is-on:hover .when-idle { display: none; }
 .btn-suggest.is-on:hover .when-hover { display: inline; }
+
+/* ---------- Records by artist: iOS-style folders of up to four covers ---------- */
+.folders-grid {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile, 180px), 40vw), 1fr));
+  column-gap: clamp(18px, 2vw, 30px); row-gap: clamp(22px, 2.4vw, 34px);
+}
+.folder { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; color: var(--fg); }
+.folder-art { position: relative; display: block; aspect-ratio: 1; }
+.folder-caption { display: flex; flex-direction: column; gap: 2px; }
+.folder-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-meta { font-size: 12px; color: var(--fg-faint); }
+.folder:focus-visible { outline: none; }
+.folder:focus-visible .folder-name { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Folders: a frosted tile with up to four covers. Cells are placed absolutely (not with CSS grid):
+   Safari sizes grid rows from the images' own size, which pushed covers out of the folder. */
+.folder-quad {
+  position: absolute; inset: 0; overflow: hidden; border-radius: 18%;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.35s var(--ease), background 0.35s var(--ease);
+}
+.folder-quad img {
+  position: absolute; width: 37%; height: 37%; object-fit: cover; border-radius: 4px; display: block;
+}
+.folder-quad img:nth-child(1) { left: 9%; top: 9%; }
+.folder-quad img:nth-child(2) { left: 54%; top: 9%; }
+.folder-quad img:nth-child(3) { left: 9%; top: 54%; }
+.folder-quad img:nth-child(4) { left: 54%; top: 54%; }
+.folder:hover .folder-quad, .folder:focus-visible .folder-quad { transform: scale(1.03); background: rgba(255,255,255,0.12); }
+
+.folder-single {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block;
+  box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05); transition: transform 0.35s var(--ease);
+}
+.folder:hover .folder-single, .folder:focus-visible .folder-single { transform: scale(1.03); }
+
+/* An open folder: expands over a blurred page, below the album view (50) and the player (40) */
+.folder-backdrop {
+  position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 24px;
+  background: rgba(11,11,12,0.55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.folder-panel {
+  width: min(820px, 100%); max-height: min(78vh, 760px); display: flex; flex-direction: column; gap: 22px;
+  padding: 26px; border-radius: 26px; box-sizing: border-box;
+  background: rgba(30,30,34,0.82); border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 60px 120px -40px rgba(0,0,0,0.9);
+}
+.folder-head { display: flex; align-items: center; gap: 18px; }
+.folder-head-text { display: flex; flex-direction: column; gap: 4px; margin-right: auto; min-width: 0; }
+.folder-head-text h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 4vw, 40px); line-height: 1; }
+.folder-head-text span { font-size: 13px; color: var(--fg-dim); }
+.folder-close { width: 32px; height: 32px; border-radius: 999px; color: var(--fg-dim); font-size: 22px; line-height: 1; }
+.folder-close:hover { color: var(--fg); background: rgba(255,255,255,0.08); }
+.folder-records { overflow-y: auto; margin: 0 -6px; padding: 6px; }
+@media (max-width: 760px) {
+  .folder-backdrop { padding: 12px; align-items: end; padding-bottom: 96px; }
+  .folder-panel { padding: 18px; border-radius: 20px; max-height: 72vh; }
+  .folder-panel { position: relative; }
+  .folder-head { flex-wrap: wrap; gap: 12px; padding-right: 32px; }
+  .folder-close { position: absolute; top: 12px; right: 12px; }
+  .folder-records .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+}

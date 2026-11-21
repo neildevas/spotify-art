@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ArtItem } from '../spotify/types';
 import { ArtTile } from './ArtTile';
 import { useLayoutMode } from './LayoutMode';
@@ -20,8 +20,6 @@ type Props = {
   /** Collection page: offer "+ Collect artist" on records whose artist isn't collected yet. */
   collectedArtistIds?: Set<string>;
   onCollectArtist?: (artist: { id: string; name: string }) => void;
-  /** Sorted by artist: a quiet divider with the name before each artist's records, like a crate. */
-  groupLabel?: (item: ArtItem) => string;
   /** Drag tiles to rearrange them; called with the new order when you let go. */
   onReorder?: (items: ArtItem[]) => void;
 };
@@ -37,7 +35,6 @@ export function ArtGrid({
   collectToggle,
   collectedArtistIds,
   onCollectArtist,
-  groupLabel,
   onReorder,
 }: Props) {
   // While dragging, show a draft order; the real order only changes when you let go.
@@ -52,7 +49,7 @@ export function ArtGrid({
   const { mode } = useLayoutMode();
   if (mode === 'single' && allowSingle) return <SingleView items={items} loading={loading} onSelect={onSelect} />;
 
-  const cls = ['grid', captions && 'grid-captions', (groupLabel || onReorder) && 'grid-ordered', onReorder && 'grid-arrange']
+  const cls = ['grid', captions && 'grid-captions', onReorder && 'grid-ordered', onReorder && 'grid-arrange']
     .filter(Boolean)
     .join(' ');
   // Columns stretch past --tile (minmax(tile, 1fr)), so tell the browser a bit more than tileSize.
@@ -98,31 +95,21 @@ export function ArtGrid({
 
   return (
     <ul className={cls} style={style}>
-      {shown.map((item, i) => {
-        const label = groupLabel?.(item);
-        const newGroup = label !== undefined && (i === 0 || groupLabel!(shown[i - 1]) !== label);
-        return (
-          <Fragment key={item.key}>
-            {newGroup && (
-              <li className="grid-divider" aria-hidden={false}>
-                <span className="grid-divider-name">{label}</span>
-              </li>
-            )}
-            <ArtTile
-              item={item}
-              index={i}
-              onSelect={onSelect}
-              tileWidth={tileWidth}
-              collectToggle={collectToggle}
-              onCollectArtist={
-                onCollectArtist && item.artists?.[0] && !collectedArtistIds?.has(item.artists[0].id) ? onCollectArtist : undefined
-              }
-              reorder={reorder || undefined}
-              dragging={!!draft && dragKey.current === item.key}
-            />
-          </Fragment>
-        );
-      })}
+      {shown.map((item, i) => (
+        <ArtTile
+          key={item.key}
+          item={item}
+          index={i}
+          onSelect={onSelect}
+          tileWidth={tileWidth}
+          collectToggle={collectToggle}
+          onCollectArtist={
+            onCollectArtist && item.artists?.[0] && !collectedArtistIds?.has(item.artists[0].id) ? onCollectArtist : undefined
+          }
+          reorder={reorder || undefined}
+          dragging={!!draft && dragKey.current === item.key}
+        />
+      ))}
     </ul>
   );
 }
