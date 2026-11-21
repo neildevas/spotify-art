@@ -1,7 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArtGrid } from './components/ArtGrid';
-import { type CollectionShelf, type CollectionSort, CollectionView } from './components/CollectionView';
+import { type ArtistsSort, type CollectionShelf, CollectionView, type RecordsView } from './components/CollectionView';
 import { DetailOverlay } from './components/DetailOverlay';
 import { Header, Segmented, type View } from './components/Header';
 import { LayoutModeContext } from './components/LayoutMode';
@@ -38,7 +38,6 @@ import {
 import { handleCallback, hasSession, logout } from './spotify/auth';
 import type { AlbumGroup, Artist, ArtItem, TimeRange, User } from './spotify/types';
 
-type Sort = 'recent' | 'title' | 'artist' | 'custom' | 'year';
 type TrackMode = 'grouped' | 'tracks';
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -50,22 +49,18 @@ const TRACK_MODES: { id: TrackMode; label: string }[] = [
   { id: 'grouped', label: 'By album' },
   { id: 'tracks', label: 'By track' },
 ];
-function sortItems(items: ArtItem[], sort: Sort, order: string[] = []) {
-  if (sort === 'recent') return items;
-  if (sort === 'custom') {
-    // Your arrangement; records added since you last arranged come first, newest first.
-    const at = new Map(order.map((id, i) => [id, i]));
-    const rank = (r: ArtItem) => at.get(r.albumId ?? '') ?? -1;
-    return items
-      .map((r, i) => ({ r, i }))
-      .sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i)
-      .map(({ r }) => r);
+/** Records in your order (newest first until you rearrange), or by artist name then year. */
+function sortItems(items: ArtItem[], sort: 'custom' | 'artist', order: string[] = []) {
+  if (sort === 'artist') {
+    return [...items].sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
   }
-  const copy = [...items];
-  if (sort === 'title') copy.sort((a, b) => a.title.localeCompare(b.title));
-  if (sort === 'artist') copy.sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
-  if (sort === 'year') copy.sort((a, b) => b.year.localeCompare(a.year));
-  return copy;
+  // Your arrangement; records added since you last arranged come first, newest first.
+  const at = new Map(order.map((id, i) => [id, i]));
+  const rank = (r: ArtItem) => at.get(r.albumId ?? '') ?? -1;
+  return items
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i)
+    .map(({ r }) => r);
 }
 
 function usePersisted<T>(key: string, initial: T) {
@@ -128,7 +123,9 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Quick filter on the Records grid (album or artist); not remembered between visits.
   const [recordQuery, setRecordQuery] = useState('');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
-  const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
+  // Records: your own order (newest on top until you rearrange) or grouped by artist. Artists sort separately.
+  const [recordsView, setRecordsView] = usePersisted<RecordsView>('sleeve.recordsView', 'order');
+  const [artistsSort, setArtistsSort] = usePersisted<ArtistsSort>('sleeve.artistsSort', 'recent');
   // "Your order": the arrangement you've dragged the Records grid into (album ids, first to last).
   const [collectionOrder, setCollectionOrder] = usePersisted<string[]>('sleeve.collectionOrder', []);
   const records = useCollection();
@@ -182,11 +179,11 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     const q = recordQuery.trim().toLowerCase();
     const all = records.map(recordToItem);
     const shown = q ? all.filter((r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)) : all;
-    return sortItems(shown, collectionSort, collectionOrder);
-  }, [records, collectionSort, recordQuery, collectionOrder]);
+    return sortItems(shown, recordsView === 'artist' ? 'artist' : 'custom', collectionOrder);
+  }, [records, recordsView, recordQuery, collectionOrder]);
   const sortedArtists = useMemo(
-    () => (collectionSort !== 'recent' && collectionSort !== 'custom' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
-    [artistShelf, collectionSort],
+    () => (artistsSort === 'name' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
+    [artistShelf, artistsSort],
   );
 
   const trackItems = useMemo(
@@ -344,8 +341,10 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onQuery={setRecordQuery}
               shelf={collectionShelf}
               onShelf={setCollectionShelf}
-              sort={collectionSort}
-              onSort={setCollectionSort}
+              recordsView={recordsView}
+              onRecordsView={setRecordsView}
+              artistsSort={artistsSort}
+              onArtistsSort={setArtistsSort}
               tileSize={tileSize}
               onSelect={setSelected}
               onOpenArtist={openSavedArtistFresh}

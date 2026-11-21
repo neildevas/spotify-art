@@ -5,19 +5,18 @@ import { ArtGrid } from './ArtGrid';
 import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
-export type CollectionSort = 'recent' | 'title' | 'artist' | 'custom' | 'year';
+/** Records: your own order (newest on top until you move things), or grouped by artist. */
+export type RecordsView = 'order' | 'artist';
+export type ArtistsSort = 'recent' | 'name';
 export type CollectionShelf = 'records' | 'artists';
 
-const RECORD_SORTS: { id: CollectionSort; label: string }[] = [
-  { id: 'recent', label: 'Recently added' },
-  { id: 'title', label: 'Album' },
-  { id: 'artist', label: 'Artist' },
-  { id: 'custom', label: 'Your order' },
+const RECORD_VIEWS: { id: RecordsView; label: string }[] = [
+  { id: 'order', label: 'Albums' },
+  { id: 'artist', label: 'By artist' },
 ];
-// Artists only have a name to sort by; any non-"recent" choice sorts them A–Z.
-const ARTIST_SORTS: { id: CollectionSort; label: string }[] = [
+const ARTIST_SORTS: { id: ArtistsSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
-  { id: 'artist', label: 'Name' },
+  { id: 'name', label: 'Name' },
 ];
 
 type Props = {
@@ -28,8 +27,10 @@ type Props = {
   onQuery: (q: string) => void;
   shelf: CollectionShelf;
   onShelf: (s: CollectionShelf) => void;
-  sort: CollectionSort;
-  onSort: (s: CollectionSort) => void;
+  recordsView: RecordsView;
+  onRecordsView: (v: RecordsView) => void;
+  artistsSort: ArtistsSort;
+  onArtistsSort: (s: ArtistsSort) => void;
   tileSize: number;
   onSelect: (item: ArtItem) => void;
   onOpenArtist: (a: SavedArtist) => void;
@@ -53,8 +54,10 @@ export function CollectionView({
   onQuery,
   shelf,
   onShelf,
-  sort,
-  onSort,
+  recordsView,
+  onRecordsView,
+  artistsSort,
+  onArtistsSort,
   tileSize,
   onSelect,
   onOpenArtist,
@@ -73,18 +76,16 @@ export function CollectionView({
           Your collection
           <span className="count">
             {totalRecords} record{totalRecords === 1 ? '' : 's'} · {artists.length} artist{artists.length === 1 ? '' : 's'}
-            {shelf === 'records' && sort === 'custom' && !query && totalRecords > 1 && ' · drag to arrange'}
+            {shelf === 'records' && recordsView === 'order' && !query && totalRecords > 1 && ' · drag to arrange'}
           </span>
         </motion.h1>
         <div className="collection-tools">
           {!empty && (
-            <Segmented
-              small
-              groupId="collectionSort"
-              value={shelf === 'artists' ? (sort === 'recent' || sort === 'custom' ? 'recent' : 'artist') : sort === 'year' ? 'recent' : sort}
-              options={shelf === 'artists' ? ARTIST_SORTS : RECORD_SORTS}
-              onChange={onSort}
-            />
+            shelf === 'artists' ? (
+              <Segmented small groupId="artistsSort" value={artistsSort} options={ARTIST_SORTS} onChange={onArtistsSort} />
+            ) : (
+              <Segmented small groupId="recordsView" value={recordsView} options={RECORD_VIEWS} onChange={onRecordsView} />
+            )
           )}
         </div>
       </div>
@@ -155,7 +156,7 @@ export function CollectionView({
           animate={{ opacity: 1, y: 0 }}
         >
           {records.length ? (
-            <motion.div key={sort} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div key={recordsView} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <ArtGrid
                 items={records}
                 loading={false}
@@ -163,9 +164,9 @@ export function CollectionView({
                 onSelect={onSelect}
                 collectedArtistIds={collectedIds}
                 onCollectArtist={onCollectArtist}
-                groupLabel={sort === 'artist' ? (item) => item.subtitle : undefined}
+                groupLabel={recordsView === 'artist' ? (item) => item.subtitle : undefined}
                 onReorder={
-                  sort === 'custom' && !query
+                  recordsView === 'order' && !query
                     ? (ordered) => onArrange(ordered.map((r) => r.albumId!).filter(Boolean))
                     : undefined
                 }
