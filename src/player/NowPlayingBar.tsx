@@ -186,7 +186,10 @@ function Bar({
   );
 }
 
-/** The player's slot for what to put on next: your on-deck record, or a suggestion from your crate. */
+/**
+ * "Need a next record?": one suggestion from your collection. Play now starts it straight away;
+ * nothing is queued, so after a record ends Spotify carries on as usual.
+ */
 function AfterRecordSlot({
   lastSong,
   onOpenAlbum,
@@ -195,36 +198,32 @@ function AfterRecordSlot({
   onOpenAlbum?: (albumId: string, trackId: string | null) => void;
 }) {
   const { playAlbum } = usePlayer();
-  const { onDeck, setOnDeck, cratePick, reroll, dismissCrate } = useAfterRecord();
-  const shown = onDeck ?? cratePick;
-  if (!shown) return null;
-  const label = onDeck ? (lastSong ? 'Up next' : 'On deck') : 'From your crate';
+  const { cratePick, reroll, dismissCrate } = useAfterRecord();
+  if (!cratePick) return null;
 
   return (
     <>
       <span className="np-divider" aria-hidden />
-      <div className="np-after">
-        <button className="np-after-record" onClick={() => onOpenAlbum?.(shown.id, null)} title={`Open ${shown.name}`}>
-          {shown.thumb ? <img src={shown.thumb} alt="" /> : <span className="np-after-cover" />}
+      <div
+        className="np-after"
+        title="A suggestion from your collection. Nothing plays automatically: after this record, Spotify carries on as usual."
+      >
+        <button className="np-after-record" onClick={() => onOpenAlbum?.(cratePick.id, null)} aria-label={`Open ${cratePick.name}`}>
+          {cratePick.thumb ? <img src={cratePick.thumb} alt="" /> : <span className="np-after-cover" />}
           <span className="np-after-text">
-            <span className={`np-after-label ${onDeck && lastSong ? 'is-soon' : ''}`}>{label}</span>
-            <span className="np-after-title">{shown.name}</span>
+            <span className={`np-after-label ${lastSong ? 'is-soon' : ''}`}>
+              {lastSong ? 'Record ending · try this?' : 'Need a next record?'}
+            </span>
+            <span className="np-after-title">{cratePick.name}</span>
           </span>
         </button>
-        <button className="np-after-btn np-after-play" onClick={() => playAlbum(shown.id, 0)} title={`Play ${shown.name} now`} aria-label={`Play ${shown.name} now`}>
-          ▶
+        <button className="np-play-now" onClick={() => playAlbum(cratePick.id, 0)} aria-label={`Play ${cratePick.name} now`}>
+          ▶ Play now
         </button>
-        {!onDeck && (
-          <button className="np-after-btn" onClick={reroll} title="Suggest another record" aria-label="Suggest another record">
-            ↻
-          </button>
-        )}
-        <button
-          className="np-after-btn np-after-remove"
-          onClick={() => (onDeck ? setOnDeck(null) : dismissCrate())}
-          title={onDeck ? 'Take off deck' : 'Hide this suggestion'}
-          aria-label={onDeck ? 'Take off deck' : 'Hide the crate suggestion'}
-        >
+        <button className="np-after-btn" onClick={reroll} title="Suggest another record" aria-label="Suggest another record">
+          ↻
+        </button>
+        <button className="np-after-btn" onClick={dismissCrate} title="Hide this suggestion" aria-label="Hide this suggestion">
           ×
         </button>
       </div>

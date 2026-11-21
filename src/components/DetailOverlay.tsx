@@ -4,7 +4,6 @@ import { useAlbumTracks } from '../hooks/useAlbumTracks';
 import { PlayButton } from '../player/PlayButton';
 import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
-import { useAfterRecord } from '../player/AfterRecord';
 import { savedArtists, useSavedArtist } from '../collection/store';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
@@ -190,7 +189,6 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
             ) : null,
             <div className="overlay-actions" key="l">
               {isPlayable(item) && <PlayButton albumId={item.albumId!} variant="large" />}
-              {isPlayable(item) && item.record && <PlayNextButton record={item.record} />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗
@@ -231,43 +229,5 @@ export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: numb
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-
-/** Put this record on deck: a reminder in the player of what to play next. One slot, so it replaces any other. */
-function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) {
-  const { nowPlaying, needsReconnect, notify } = usePlayer();
-  const { onDeck, setOnDeck } = useAfterRecord();
-  // Nothing to follow, or it's the record that's already on: just use Play.
-  if (needsReconnect || !nowPlaying || nowPlaying.albumId === record.id) return null;
-  const isOnDeck = onDeck?.id === record.id;
-  if (isOnDeck) {
-    // Already on deck: say so, with a plain button to take it off (no hover needed).
-    return (
-      <span className="deck-state">
-        <span className="deck-badge">✓ On deck</span>
-        <button
-          className="btn-ghost"
-          onClick={() => {
-            setOnDeck(null);
-            notify(`Took “${record.name}” off deck`);
-          }}
-        >
-          Take off deck
-        </button>
-      </span>
-    );
-  }
-  return (
-    <button
-      className="btn-ghost"
-      onClick={() => {
-        notify(onDeck ? `On deck: “${record.name}” (replaces “${onDeck.name}”)` : `On deck: “${record.name}”`);
-        setOnDeck(record);
-      }}
-      title="Keep this record in the player as what to play next"
-    >
-      ＋ On deck
-    </button>
   );
 }

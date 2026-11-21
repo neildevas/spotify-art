@@ -1,24 +1,20 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useCollection } from '../collection/store';
 import type { RecordInfo } from '../spotify/types';
 import { usePlayer } from './PlayerContext';
 
 /**
- * What to put on next: one record "on deck", or a suggestion pulled from your crate. A reminder,
- * not automation: Sleeve never changes what Spotify plays by itself. When a record ends Spotify
- * carries on as usual (its Autoplay), and you press play on your next record when you want it.
+ * A suggested next record from your collection, playable in one click. Only a suggestion: Sleeve
+ * never changes what Spotify plays by itself, so when a record ends Spotify carries on as usual.
  */
 type AfterRecordApi = {
-  onDeck: RecordInfo | null;
-  setOnDeck: (r: RecordInfo | null) => void;
-  /** A record from your collection you haven't played in a while (shown when nothing's on deck). */
+  /** A record from your collection you haven't played in a while. */
   cratePick: RecordInfo | null;
   reroll: () => void;
   /** Hide the crate suggestion until the next record starts. */
   dismissCrate: () => void;
 };
 
-const DECK_KEY = 'sleeve.onDeck';
 const PLAYED_KEY = 'sleeve.lastPlayed';
 // Records played in Sleeve within this window sit out of the crate (unless that's all there is).
 const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
@@ -69,49 +65,43 @@ export function useAfterRecord() {
 export function AfterRecordProvider({ children }: { children: React.ReactNode }) {
   const { nowPlaying } = usePlayer();
   const records = useCollection();
-  const [onDeck, setOnDeckState] = useState<RecordInfo | null>(() => readJson(DECK_KEY, null));
   const [cratePick, setCratePick] = useState<RecordInfo | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   const lastPlayed = useRef<Record<string, number>>(readJson(PLAYED_KEY, {}));
   const seen = useRef<string[]>([]);
 
-  const setOnDeck = useCallback((r: RecordInfo | null) => {
-    setOnDeckState(r);
-    writeJson(DECK_KEY, r);
-  }, []);
+  // On deck was retired; clear any record left there.
+  useEffect(() => writeJson('sleeve.onDeck', null), []);
 
   const currentId = nowPlaying?.albumId ?? null;
 
-  // Remember when each record was last on (for the crate), and clear the deck once its record is playing.
+  // Remember when each record was last on, so suggestions favour ones you haven't heard in a while.
   useEffect(() => {
     if (!currentId || !nowPlaying?.fromAlbum) return;
     lastPlayed.current = { ...lastPlayed.current, [currentId]: Date.now() };
     writeJson(PLAYED_KEY, lastPlayed.current);
-    if (onDeck?.id === currentId) setOnDeck(null);
-  }, [currentId, nowPlaying?.fromAlbum]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentId, nowPlaying?.fromAlbum]);
 
   // A fresh crate suggestion when the record changes, when you ask for another, or when the collection changes.
   const recordIds = records.map((r) => r.id).join(',');
   useEffect(() => {
-    if (onDeck || !currentId) return;
+    if (!currentId) return;
     setCratePick((prev) => {
       if (rerollToken === 0 && prev && prev.id !== currentId && records.some((r) => r.id === prev.id)) return prev;
       const next = pickFromCrate(records, currentId, lastPlayed.current, seen.current);
       if (next) seen.current = [...seen.current.filter((id) => id !== next.id), next.id].slice(-NO_REPEAT);
       return next;
     });
-  }, [onDeck, currentId, recordIds, rerollToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentId, recordIds, rerollToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const api = useMemo<AfterRecordApi>(
     () => ({
-      onDeck,
-      setOnDeck,
-      cratePick: onDeck || (currentId && dismissedFor === currentId) ? null : cratePick,
+      cratePick: currentId && dismissedFor === currentId ? null : cratePick,
       reroll: () => setRerollToken((n) => n + 1),
       dismissCrate: () => setDismissedFor(currentId),
     }),
-    [onDeck, setOnDeck, cratePick, currentId, dismissedFor],
+    [cratePick, currentId, dismissedFor],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
