@@ -553,7 +553,7 @@ img.np-link:hover { transform: scale(1.06); }
 .np-volume { display: flex; align-items: center; gap: 6px; width: 110px; color: var(--fg-dim); font-size: 13px; }
 
 .player-toast {
-  position: fixed; left: 50%; bottom: 100px; z-index: 41; translate: -50% 0;
+  position: fixed; left: 50%; bottom: 100px; z-index: 60; translate: -50% 0; /* above the album view (50) */
   max-width: min(560px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px; border-radius: 12px; font-size: 13px;

@@ -102,6 +102,10 @@ function toNowPlaying(s: Spotify.PlaybackState): NowPlaying {
 }
 
 const VOLUME_KEY = 'sleeve.volume';
+// Queuing a record: pause between songs, and how long a rate-limit wait we'll sit through before giving up.
+const QUEUE_GAP_MS = 300;
+const MAX_QUEUE_WAIT_SEC = 20;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('idle');
@@ -236,8 +240,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setNotice(`Adding “${title}” to the queue…`);
       try {
         const deviceId = await ensureDevice();
-        // Spotify only queues one song per request, so add them one after another to keep their order.
-        for (const id of trackIds) await apiAddToQueue(deviceId, id);
+        // Spotify only queues one song per request. Add them one after another (keeps their order),
+        // spaced out so a long record doesn't trip Spotify's rate limit; if it does, wait and carry on.
+        for (const [i, id] of trackIds.entries()) {
+          if (i > 0) await sleep(QUEUE_GAP_MS);
+          for (let attempt = 0; ; attempt++) {
+            try {
+              await apiAddToQueue(deviceId, id);
+              break;
+            } catch (e) {
+              if (!(e instanceof RateLimitError) || attempt >= 2 || e.retryAfterSec > MAX_QUEUE_WAIT_SEC) throw e;
+              setNotice(`Adding “${title}” to the queue… (${i} of ${trackIds.length})`);
+              await sleep(e.retryAfterSec * 1000 + 250);
+            }
+          }
+        }
         setNotice(`Added ${trackIds.length} song${trackIds.length === 1 ? '' : 's'} from “${title}” to the queue`);
       } catch (e) {
         setNotice(null);

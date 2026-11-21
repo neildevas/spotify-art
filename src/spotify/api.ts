@@ -25,7 +25,7 @@ export class AuthError extends Error {}
  * Spotify rate-limits groups of endpoints separately (the groups aren't published), so we back off
  * per area instead of globally: a limit on artist pages shouldn't block search, and vice versa.
  */
-type Bucket = 'search' | 'artists' | 'albums' | 'top' | 'library' | 'profile' | 'player' | 'other';
+type Bucket = 'search' | 'artists' | 'albums' | 'top' | 'library' | 'profile' | 'player' | 'queue' | 'other';
 
 const BUCKET_LABEL: Record<Bucket, string> = {
   search: 'search',
@@ -35,6 +35,7 @@ const BUCKET_LABEL: Record<Bucket, string> = {
   library: 'your saved albums',
   profile: 'your profile',
   player: 'playback',
+  queue: 'the queue',
   other: 'this request',
 };
 
@@ -44,6 +45,8 @@ function bucketFor(path: string): Bucket {
   if (p.startsWith('/artists')) return 'artists';
   if (p.startsWith('/albums')) return 'albums';
   if (p.startsWith('/me/top')) return 'top';
+  // Queue requests get their own bucket so a burst of them can't block play/pause.
+  if (p.startsWith('/me/player/queue')) return 'queue';
   if (p.startsWith('/me/player')) return 'player';
   if (p.startsWith('/me/albums')) return 'library';
   if (p === '/me' || p.startsWith('/me?')) return 'profile';
@@ -138,7 +141,13 @@ async function spotify<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
   if (!res.ok) throw new Error(`Spotify ${res.status}: ${await res.text()}`);
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
   const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Some write endpoints (like adding to the queue) answer 200 with a non-JSON body: that's still a success.
+    return undefined as T;
+  }
 }
 
 /** Cached GET. Same path = same request, shared and reused until it's older than `ttlMs`. */
