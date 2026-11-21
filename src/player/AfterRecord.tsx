@@ -11,8 +11,6 @@ type AfterRecordApi = {
   /** A record from your collection you haven't played in a while. */
   cratePick: RecordInfo | null;
   reroll: () => void;
-  /** Hide the crate suggestion until the next record starts. */
-  dismissCrate: () => void;
 };
 
 const PLAYED_KEY = 'sleeve.lastPlayed';
@@ -67,7 +65,6 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const records = useCollection();
   const [cratePick, setCratePick] = useState<RecordInfo | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
-  const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   const lastPlayed = useRef<Record<string, number>>(readJson(PLAYED_KEY, {}));
   const seen = useRef<string[]>([]);
 
@@ -97,11 +94,10 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
 
   const api = useMemo<AfterRecordApi>(
     () => ({
-      cratePick: currentId && dismissedFor === currentId ? null : cratePick,
+      cratePick,
       reroll: () => setRerollToken((n) => n + 1),
-      dismissCrate: () => setDismissedFor(currentId),
     }),
-    [cratePick, currentId, dismissedFor],
+    [cratePick],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

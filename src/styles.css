@@ -515,7 +515,7 @@ code { font-size: 0.9em; background: rgba(255,255,255,0.08); padding: 1px 5px; b
 .now-playing {
   position: fixed; left: 50%; bottom: 18px; z-index: 40;
   translate: -50% 0;
-  width: min(1080px, calc(100vw - 32px));
+  width: min(1000px, calc(100vw - 32px));
   display: grid; grid-template-columns: auto minmax(0, 1.1fr) auto minmax(0, 1.2fr) auto auto auto;
   align-items: center; gap: 16px;
   padding: 10px 18px 10px 10px; border-radius: 18px;
@@ -564,10 +564,11 @@ img.np-link:hover { transform: scale(1.06); }
 @media (max-width: 760px) {
   .now-playing { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
   .np-progress { grid-column: 1 / -1; grid-row: 2; }
-  .np-volume, .np-divider { display: none; }
-  /* Small screens: the on-deck slot gets its own row under the progress bar */
-  .np-after { grid-column: 1 / -1; grid-row: 3; max-width: none; }
-  .player-toast { bottom: 168px; } /* clear the taller two-row player */
+  .np-volume { display: none; }
+  .np-progress { grid-column: 1 / 3; }
+  .np-suggest { grid-column: 3; grid-row: 2; justify-self: end; }
+  .np-suggest-label { display: none; }
+  .np-suggest-btn { padding: 0 9px; }
 }
 
 /* ---------- Artists: type only, no photos ---------- */
@@ -856,19 +857,37 @@ img.np-link:hover { transform: scale(1.06); }
 .player-toast.is-info { background: rgba(28,28,32,0.95); border-color: var(--line); color: var(--fg); cursor: default; }
 
 /* ---------- After this record: on deck / from the crate ---------- */
-.np-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.1); }
-.np-after { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 400px; }
-.np-after-record { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0; text-align: left; color: var(--fg); }
-.np-after-record img, .np-after-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-.np-after-record:hover .np-after-title { text-decoration: underline; text-underline-offset: 3px; }
-.np-after-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.np-after-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fg-faint); white-space: nowrap; }
-.np-after-label.is-soon { color: var(--accent); }
-.np-after-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-after-btn { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; color: var(--fg-dim); background: rgba(255,255,255,0.06); }
-.np-after-btn:hover { color: var(--fg); background: rgba(255,255,255,0.14); }
-.np-play-now { flex-shrink: 0; height: 30px; padding: 0 12px; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.np-suggest { position: relative; }
+.np-suggest-btn {
+  height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18);
+  display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--fg); white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.np-suggest-btn:hover, .np-suggest-btn.is-on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+.suggest-panel {
+  position: absolute; right: -4px; bottom: calc(100% + 18px); z-index: 45; width: 340px;
+  display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 16px;
+  background: #19191c; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 24px 60px -16px rgba(0,0,0,0.9);
+}
+.suggest-head { display: flex; justify-content: space-between; align-items: baseline; }
+.suggest-head .eyebrow { margin: 0; font-size: 11px; }
+.suggest-from { font-size: 12px; color: var(--fg-faint); }
+.suggest-record { display: flex; gap: 14px; align-items: center; padding: 0; text-align: left; color: var(--fg); }
+.suggest-record img, .suggest-cover { width: 84px; height: 84px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); box-shadow: 0 10px 24px -10px rgba(0,0,0,0.9); }
+.suggest-record:hover .suggest-title { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.suggest-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.suggest-title { font-family: var(--serif); font-size: 24px; line-height: 1.05; }
+.suggest-sub { font-size: 12px; color: var(--fg-dim); }
+.suggest-actions { display: flex; gap: 8px; }
+.suggest-empty { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
+.np-play-now { flex-shrink: 0; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .np-play-now:hover { background: #fff; }
+.btn-small { height: 32px; padding: 0 14px; font-size: 12px; }
+@media (max-width: 760px) {
+  /* Panel spans the player's width, just above it */
+  .np-suggest { position: static; }
+  .suggest-panel { left: 0; right: 0; width: auto; bottom: calc(100% + 12px); }
+}
 
 /* ---------- Records: artist dividers and arranging ---------- */
 .grid-ordered { grid-auto-flow: row; } /* keep the exact order (no back-filling gaps) */

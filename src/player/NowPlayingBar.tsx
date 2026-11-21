@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { login } from '../spotify/auth';
 import { useAfterRecord } from './AfterRecord';
 import { usePlayer } from './PlayerContext';
@@ -81,7 +81,7 @@ export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string,
               />
             ) : null}
             {nowPlaying ? (
-              <AfterRecordSlot lastSong={nowPlaying.fromAlbum && nowPlaying.isLast} onOpenAlbum={onOpenAlbum} />
+              <SuggestButton onOpenAlbum={onOpenAlbum} />
             ) : (
               <span className="np-connecting">Connecting to Spotify…</span>
             )}
@@ -186,47 +186,102 @@ function Bar({
   );
 }
 
+const SparkIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" />
+  </svg>
+);
+
 /**
- * "Need a next record?": one suggestion from your collection. Play now starts it straight away;
- * nothing is queued, so after a record ends Spotify carries on as usual.
+ * "Suggest": a button in the player that opens a small panel with one record from your collection
+ * (favouring ones you haven't played in a while). Play now starts it straight away; nothing is
+ * queued, so after a record ends Spotify carries on as usual.
  */
-function AfterRecordSlot({
-  lastSong,
-  onOpenAlbum,
-}: {
-  lastSong: boolean;
-  onOpenAlbum?: (albumId: string, trackId: string | null) => void;
-}) {
+function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
   const { playAlbum } = usePlayer();
-  const { cratePick, reroll, dismissCrate } = useAfterRecord();
-  if (!cratePick) return null;
+  const { cratePick: pick, reroll } = useAfterRecord();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
-    <>
-      <span className="np-divider" aria-hidden />
-      <div
-        className="np-after"
-        title="A suggestion from your collection. Nothing plays automatically: after this record, Spotify carries on as usual."
+    <div className="np-suggest" ref={ref}>
+      <button
+        className={`np-suggest-btn ${open ? 'is-on' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="Suggest a record from your collection"
       >
-        <button className="np-after-record" onClick={() => onOpenAlbum?.(cratePick.id, null)} aria-label={`Open ${cratePick.name}`}>
-          {cratePick.thumb ? <img src={cratePick.thumb} alt="" /> : <span className="np-after-cover" />}
-          <span className="np-after-text">
-            <span className={`np-after-label ${lastSong ? 'is-soon' : ''}`}>
-              {lastSong ? 'Record ending · try this?' : 'Need a next record?'}
-            </span>
-            <span className="np-after-title">{cratePick.name}</span>
-          </span>
-        </button>
-        <button className="np-play-now" onClick={() => playAlbum(cratePick.id, 0)} aria-label={`Play ${cratePick.name} now`}>
-          ▶ Play now
-        </button>
-        <button className="np-after-btn" onClick={reroll} title="Suggest another record" aria-label="Suggest another record">
-          ↻
-        </button>
-        <button className="np-after-btn" onClick={dismissCrate} title="Hide this suggestion" aria-label="Hide this suggestion">
-          ×
-        </button>
-      </div>
-    </>
+        <SparkIcon />
+        <span className="np-suggest-label">Suggest</span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="suggest-panel"
+            role="dialog"
+            aria-label="Suggested next"
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className="suggest-head">
+              <span className="eyebrow">Suggested next</span>
+              <span className="suggest-from">from your collection</span>
+            </div>
+            {pick ? (
+              <>
+                <button
+                  className="suggest-record"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenAlbum?.(pick.id, null);
+                  }}
+                  title={`Open ${pick.name}`}
+                >
+                  {pick.thumb ? <img src={pick.thumb} alt="" /> : <span className="suggest-cover" />}
+                  <span className="suggest-text">
+                    <span className="suggest-title">{pick.name}</span>
+                    <span className="suggest-sub">
+                      {pick.artists.map((a) => a.name).join(', ')}
+                      {pick.year ? ` · ${pick.year}` : ''}
+                    </span>
+                  </span>
+                </button>
+                <div className="suggest-actions">
+                  <button
+                    className="np-play-now"
+                    onClick={() => {
+                      setOpen(false);
+                      playAlbum(pick.id, 0);
+                    }}
+                  >
+                    ▶ Play now
+                  </button>
+                  <button className="btn-ghost btn-small" onClick={reroll}>
+                    ↻ Another
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="suggest-empty">Add a few more records to your collection to get suggestions.</p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
