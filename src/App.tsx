@@ -349,6 +349,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               tileSize={tileSize}
               onSelect={setSelected}
               onOpenArtist={openSavedArtistFresh}
+              onOpenArtistRef={(a) => openArtist(a, 'collection')}
               onCollectArtist={collectArtist}
               onBrowse={() => setView('search')}
               onBrowseLikes={() => setView('likes')}

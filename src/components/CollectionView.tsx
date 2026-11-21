@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import type { SavedArtist } from '../collection/store';
 import type { ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
+import { ArtistFolders } from './ArtistFolders';
 import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
@@ -34,6 +35,8 @@ type Props = {
   tileSize: number;
   onSelect: (item: ArtItem) => void;
   onOpenArtist: (a: SavedArtist) => void;
+  /** Open any artist's page (from a "By artist" folder). */
+  onOpenArtistRef: (a: { id: string; name: string }) => void;
   onCollectArtist: (a: { id: string; name: string }) => void;
   onBrowse: () => void;
   /** Go to the Likes tab (records from your Spotify liked songs). */
@@ -61,6 +64,7 @@ export function CollectionView({
   tileSize,
   onSelect,
   onOpenArtist,
+  onOpenArtistRef,
   onCollectArtist,
   onBrowse,
   onBrowseLikes,
@@ -157,20 +161,19 @@ export function CollectionView({
         >
           {records.length ? (
             <motion.div key={recordsView} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ArtGrid
-                items={records}
-                loading={false}
-                tileSize={tileSize}
-                onSelect={onSelect}
-                collectedArtistIds={collectedIds}
-                onCollectArtist={onCollectArtist}
-                groupLabel={recordsView === 'artist' ? (item) => item.subtitle : undefined}
-                onReorder={
-                  recordsView === 'order' && !query
-                    ? (ordered) => onArrange(ordered.map((r) => r.albumId!).filter(Boolean))
-                    : undefined
-                }
-              />
+              {recordsView === 'artist' ? (
+                <ArtistFolders items={records} tileSize={tileSize} onSelect={onSelect} onOpenArtist={onOpenArtistRef} />
+              ) : (
+                <ArtGrid
+                  items={records}
+                  loading={false}
+                  tileSize={tileSize}
+                  onSelect={onSelect}
+                  collectedArtistIds={collectedIds}
+                  onCollectArtist={onCollectArtist}
+                  onReorder={!query ? (ordered) => onArrange(ordered.map((r) => r.albumId!).filter(Boolean)) : undefined}
+                />
+              )}
             </motion.div>
           ) : (
             <p className="search-hint">

@@ -901,14 +901,8 @@ img.np-link:hover { transform: scale(1.06); }
   .suggest-panel { left: 0; right: 0; width: auto; bottom: calc(100% + 12px); }
 }
 
-/* ---------- Records: artist dividers and arranging ---------- */
+/* ---------- Records: arranging ---------- */
 .grid-ordered { grid-auto-flow: row; } /* keep the exact order (no back-filling gaps) */
-.grid-divider {
-  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px;
-  padding: 18px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px;
-}
-.grid-divider:first-child { padding-top: 0; }
-.grid-divider-name { font-family: var(--serif); font-size: clamp(22px, calc(var(--tile, 180px) * 0.15), 34px); line-height: 1.1; color: var(--fg); }
 .grid-arrange .tile { cursor: grab; }
 .grid-arrange .tile:active { cursor: grabbing; }
 .tile-dragging { opacity: 0.35; }
@@ -917,3 +911,73 @@ img.np-link:hover { transform: scale(1.06); }
 .btn-suggest.is-on { background: rgba(255,255,255,0.12); }
 .btn-suggest.is-on:hover .when-idle { display: none; }
 .btn-suggest.is-on:hover .when-hover { display: inline; }
+
+/* ---------- Records by artist: folders (artist photo in front, their records peeking out behind) ---------- */
+.folders-grid {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile, 180px), 40vw), 1fr));
+  column-gap: clamp(18px, 2vw, 30px); row-gap: clamp(22px, 2.4vw, 34px);
+}
+.folder { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; color: var(--fg); }
+.folder-stack { position: relative; display: block; aspect-ratio: 1; margin: 12px 12px 0 0; isolation: isolate; }
+.folder-front, .folder-peek { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 6px; }
+.folder-peek {
+  object-fit: cover; display: block; z-index: -1;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06); transition: transform 0.4s var(--ease);
+}
+.folder-peek-1 { transform: translate(6px, -6px); }
+.folder-peek-2 { transform: translate(12px, -12px); z-index: -2; filter: brightness(0.75); }
+.folder-front {
+  display: grid; place-items: end start; overflow: hidden; background: var(--bg-raised);
+  box-shadow: 0 30px 60px -28px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.05);
+  transition: box-shadow 0.4s var(--ease);
+}
+.folder-front img, .folder-head-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.folder-front::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.65)); }
+.folder-photo-fallback { filter: brightness(0.45) saturate(0.6) blur(2px); transform: scale(1.06); }
+.folder-initial {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--serif); font-size: 56px; color: rgba(243,241,236,0.8);
+}
+.folder-name {
+  position: relative; z-index: 1; padding: 12px; font-family: var(--serif); line-height: 1.02;
+  font-size: clamp(17px, calc(var(--tile, 180px) * 0.12), 28px); text-shadow: 0 1px 12px rgba(0,0,0,0.5);
+}
+.folder-meta { font-size: 12px; color: var(--fg-faint); }
+.folder:hover .folder-peek-1, .folder:focus-visible .folder-peek-1 { transform: translate(10px, -10px) rotate(2deg); }
+.folder:hover .folder-peek-2, .folder:focus-visible .folder-peek-2 { transform: translate(18px, -16px) rotate(4deg); }
+.folder:hover .folder-front, .folder:focus-visible .folder-front { box-shadow: 0 44px 80px -30px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.1); }
+.folder:focus-visible { outline: none; }
+.folder:focus-visible .folder-meta { color: var(--fg); }
+
+/* An open folder: expands over a blurred page, below the album view (50) and the player (40) */
+.folder-backdrop {
+  position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 24px;
+  background: rgba(11,11,12,0.55); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.folder-panel {
+  width: min(820px, 100%); max-height: min(78vh, 760px); display: flex; flex-direction: column; gap: 22px;
+  padding: 26px; border-radius: 26px; box-sizing: border-box;
+  background: rgba(30,30,34,0.82); border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 60px 120px -40px rgba(0,0,0,0.9);
+}
+.folder-head { display: flex; align-items: center; gap: 18px; }
+.folder-head-photo {
+  position: relative; flex: none; width: 72px; height: 72px; border-radius: 6px; overflow: hidden; background: var(--bg-raised);
+}
+.folder-head-photo .folder-initial { font-size: 30px; }
+.folder-head-text { display: flex; flex-direction: column; gap: 4px; margin-right: auto; min-width: 0; }
+.folder-head-text h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 4vw, 40px); line-height: 1; }
+.folder-head-text span { font-size: 13px; color: var(--fg-dim); }
+.folder-close { width: 32px; height: 32px; border-radius: 999px; color: var(--fg-dim); font-size: 22px; line-height: 1; }
+.folder-close:hover { color: var(--fg); background: rgba(255,255,255,0.08); }
+.folder-records { overflow-y: auto; margin: 0 -6px; padding: 6px; }
+@media (max-width: 760px) {
+  .folder-backdrop { padding: 12px; align-items: end; padding-bottom: 96px; }
+  .folder-panel { padding: 18px; border-radius: 20px; max-height: 72vh; }
+  .folder-panel { position: relative; }
+  .folder-head { flex-wrap: wrap; gap: 12px; padding-right: 32px; }
+  .folder-head-photo { width: 56px; height: 56px; }
+  .folder-close { position: absolute; top: 12px; right: 12px; }
+  .folder-records .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+}
