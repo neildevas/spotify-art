@@ -1,5 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { RateLimitError, playAlbum as apiPlayAlbum, playTracks as apiPlayTracks } from '../spotify/api';
+import {
+  RateLimitError,
+  addToQueue as apiAddToQueue,
+  playAlbum as apiPlayAlbum,
+  playTracks as apiPlayTracks,
+} from '../spotify/api';
 import { PLAYBACK_SCOPES, getAccessToken, hasScopes } from '../spotify/auth';
 
 /**
@@ -34,6 +39,14 @@ type PlayerApi = {
   playAlbum: (albumId: string, trackIndex?: number) => Promise<void>;
   /** Play a list of songs in order, starting at `index`. */
   playTracks: (trackIds: string[], index?: number) => Promise<void>;
+  /** Add a song to Spotify's queue (or just play it, if nothing is playing yet). */
+  queueTrack: (trackId: string, title: string) => Promise<void>;
+  /** Queue a whole record: its songs go onto Spotify's queue in order (or it just plays, if nothing is on). */
+  queueRecord: (albumId: string, trackIds: string[], title: string) => Promise<void>;
+  /** Bumps whenever something is added to the queue, so an open "Up next" list can refresh. */
+  queueVersion: number;
+  /** A short, friendly confirmation (e.g. "Added to queue"); clears itself. */
+  notice: string | null;
   toggle: () => void;
   next: () => void;
   previous: () => void;
@@ -93,6 +106,13 @@ const VOLUME_KEY = 'sleeve.volume';
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [queueVersion, setQueueVersion] = useState(0);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 2600);
+    return () => clearTimeout(t);
+  }, [notice]);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [volume, setVolumeState] = useState(() => {
     const v = Number(localStorage.getItem(VOLUME_KEY));
@@ -189,6 +209,47 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [needsReconnect, nowPlaying?.trackId, ensureDevice],
   );
 
+  const queueTrack = useCallback(
+    async (trackId: string, title: string) => {
+      if (needsReconnect) return;
+      // Spotify can only queue onto something that's playing; with nothing on, just start the song.
+      if (!nowPlaying) return playTracks([trackId]);
+      setError(null);
+      try {
+        const deviceId = await ensureDevice();
+        await apiAddToQueue(deviceId, trackId);
+        setNotice(`Added “${title}” to the queue`);
+        setQueueVersion((v) => v + 1);
+      } catch (e) {
+        if (e instanceof RateLimitError) setError(e.message);
+        else setError(`Couldn’t add to the queue: ${(e as Error).message}`);
+      }
+    },
+    [needsReconnect, nowPlaying, playTracks, ensureDevice],
+  );
+
+  const queueRecord = useCallback(
+    async (albumId: string, trackIds: string[], title: string) => {
+      if (needsReconnect || !trackIds.length) return;
+      if (!nowPlaying) return playAlbum(albumId);
+      setError(null);
+      setNotice(`Adding “${title}” to the queue…`);
+      try {
+        const deviceId = await ensureDevice();
+        // Spotify only queues one song per request, so add them one after another to keep their order.
+        for (const id of trackIds) await apiAddToQueue(deviceId, id);
+        setNotice(`Added ${trackIds.length} song${trackIds.length === 1 ? '' : 's'} from “${title}” to the queue`);
+      } catch (e) {
+        setNotice(null);
+        if (e instanceof RateLimitError) setError(e.message);
+        else setError(`Couldn’t add “${title}” to the queue: ${(e as Error).message}`);
+      } finally {
+        setQueueVersion((v) => v + 1);
+      }
+    },
+    [needsReconnect, nowPlaying, playAlbum, ensureDevice],
+  );
+
   const api = useMemo<PlayerApi>(
     () => ({
       status,
@@ -198,6 +259,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       volume,
       playAlbum,
       playTracks,
+      queueTrack,
+      queueRecord,
+      queueVersion,
+      notice,
       toggle: () => player.current?.togglePlay(),
       next: () => player.current?.nextTrack(),
       previous: () => player.current?.previousTrack(),
@@ -212,7 +277,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       },
       dismissError: () => setError(null),
     }),
-    [status, error, needsReconnect, nowPlaying, volume, playAlbum, playTracks],
+    [status, error, needsReconnect, nowPlaying, volume, playAlbum, playTracks, queueTrack, queueRecord, queueVersion, notice],
   );
 
   return <PlayerContext.Provider value={api}>{children}</PlayerContext.Provider>;

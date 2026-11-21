@@ -2,6 +2,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { login } from '../spotify/auth';
 import { usePlayer } from './PlayerContext';
+import { QueueIcon } from './QueueButton';
+import { UpNext } from './UpNext';
 
 const fmt = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -21,7 +23,8 @@ function useLivePosition(position: number, measuredAt: number, paused: boolean, 
 
 /** Floating player bar; appears once something has played and stays across tabs. */
 export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
-  const { nowPlaying, error, dismissError, toggle, next, previous, seek, volume, setVolume, status } = usePlayer();
+  const { nowPlaying, error, dismissError, notice, toggle, next, previous, seek, volume, setVolume, status } = usePlayer();
+  const [showQueue, setShowQueue] = useState(false);
 
   return (
     <>
@@ -42,7 +45,21 @@ export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string,
             )}
           </motion.div>
         )}
+        {!error && notice && (
+          <motion.div
+            key="notice"
+            className="player-toast is-info"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            role="status"
+          >
+            {notice}
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      <AnimatePresence>{showQueue && nowPlaying && <UpNext onClose={() => setShowQueue(false)} />}</AnimatePresence>
 
       <AnimatePresence>
         {(nowPlaying || status === 'connecting') && (
@@ -62,6 +79,8 @@ export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string,
                 onSeek={seek}
                 volume={volume}
                 onVolume={setVolume}
+                queueOpen={showQueue}
+                onQueue={() => setShowQueue((v) => !v)}
                 onOpen={
                   onOpenAlbum && nowPlaying.albumId ? () => onOpenAlbum(nowPlaying.albumId!, nowPlaying.trackId) : undefined
                 }
@@ -85,6 +104,8 @@ function Bar({
   volume,
   onVolume,
   onOpen,
+  queueOpen,
+  onQueue,
 }: {
   np: NonNullable<ReturnType<typeof usePlayer>['nowPlaying']>;
   onToggle: () => void;
@@ -95,6 +116,8 @@ function Bar({
   onVolume: (v: number) => void;
   /** Open the playing album's detail view. */
   onOpen?: () => void;
+  queueOpen: boolean;
+  onQueue: () => void;
 }) {
   const pos = useLivePosition(np.position, np.measuredAt, np.paused, np.duration);
   const pct = np.duration ? (pos / np.duration) * 100 : 0;
@@ -136,6 +159,15 @@ function Bar({
         </button>
         <button className="np-btn" onClick={onNext} aria-label="Next track">
           ⏭
+        </button>
+        <button
+          className={`np-btn np-queue ${queueOpen ? 'is-on' : ''}`}
+          onClick={onQueue}
+          aria-label="Up next"
+          aria-expanded={queueOpen}
+          title="Up next"
+        >
+          <QueueIcon size={16} />
         </button>
       </div>
 

@@ -165,6 +165,16 @@ export const playTracks = (deviceId: string, trackIds: string[], position = 0) =
     body: { uris: trackIds.map((id) => `spotify:track:${id}`), offset: { position } },
   });
 
+/** Add one song to the end of Spotify's own queue (the same queue the Spotify apps show). */
+export const addToQueue = (deviceId: string, trackId: string) =>
+  spotify<void>(
+    `/me/player/queue?uri=${encodeURIComponent(`spotify:track:${trackId}`)}&device_id=${encodeURIComponent(deviceId)}`,
+    { method: 'POST' },
+  );
+
+/** What plays next: songs you queued, then the rest of the current album or list. */
+export const getQueue = () => spotify<{ currently_playing: Track | null; queue: Track[] }>('/me/player/queue');
+
 export const savedAlbumsHead = () => spotify<Paging<SavedAlbum>>('/me/albums?limit=1');
 
 /** Yields saved albums page by page (50 at a time) so the grid can fill in progressively. */
