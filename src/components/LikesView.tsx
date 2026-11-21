@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { collection, useInCollection } from '../collection/store';
 import type { Like } from '../hooks/useLikes';
 import { usePlayer } from '../player/PlayerContext';
-import { AddToQueueButton } from '../player/QueueButton';
 import type { ArtItem } from '../spotify/types';
 
 export type LikeRow = { like: Like; item: ArtItem };
@@ -71,7 +70,6 @@ export function LikesView({ rows, total, loading, refreshing, error, backLabel, 
             <span>Song</span>
             <span>Record</span>
             <span>Time</span>
-            <span />
             <span />
           </div>
           {rows.map((r, i) => (
@@ -153,7 +151,6 @@ function LikeItem({
         <span className="likes-type"> · {TYPE[record.type] ?? 'Album'}</span>
       </span>
       <span className="likes-meta">{like.duration}</span>
-      <AddToQueueButton trackId={like.trackId} title={like.name} />
       <button
         className={`likes-add ${owned ? 'is-in' : ''}`}
         onClick={(e) => {

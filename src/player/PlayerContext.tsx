@@ -1,10 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  RateLimitError,
-  addToQueue as apiAddToQueue,
-  playAlbum as apiPlayAlbum,
-  playTracks as apiPlayTracks,
-} from '../spotify/api';
+import { RateLimitError, playAlbum as apiPlayAlbum, playTracks as apiPlayTracks } from '../spotify/api';
 import { PLAYBACK_SCOPES, getAccessToken, hasScopes } from '../spotify/auth';
 
 /**
@@ -25,6 +20,10 @@ export type NowPlaying = {
   duration: number;
   /** When `position` was measured, for smooth progress between SDK updates. */
   measuredAt: number;
+  /** Playing a whole record (album context), not a list of songs. */
+  fromAlbum: boolean;
+  /** Nothing comes after this song in what's playing: the record's last song. */
+  isLast: boolean;
 };
 
 type Status = 'idle' | 'connecting' | 'ready' | 'error';
@@ -39,14 +38,11 @@ type PlayerApi = {
   playAlbum: (albumId: string, trackIndex?: number) => Promise<void>;
   /** Play a list of songs in order, starting at `index`. */
   playTracks: (trackIds: string[], index?: number) => Promise<void>;
-  /** Add a song to Spotify's queue (or just play it, if nothing is playing yet). */
-  queueTrack: (trackId: string, title: string) => Promise<void>;
-  /** Queue a whole record: its songs go onto Spotify's queue in order (or it just plays, if nothing is on). */
-  queueRecord: (albumId: string, trackIds: string[], title: string) => Promise<void>;
-  /** Bumps whenever something is added to the queue, so an open "Up next" list can refresh. */
-  queueVersion: number;
-  /** A short, friendly confirmation (e.g. "Added to queue"); clears itself. */
+  /** When Sleeve last asked Spotify to play something (to tell a record ending from you starting another). */
+  lastPlayRequestAt: () => number;
+  /** A short, friendly confirmation that clears itself. */
   notice: string | null;
+  notify: (message: string) => void;
   toggle: () => void;
   next: () => void;
   previous: () => void;
@@ -98,25 +94,23 @@ function toNowPlaying(s: Spotify.PlaybackState): NowPlaying {
     position: s.position,
     duration: s.duration,
     measuredAt: Date.now(),
+    fromAlbum: !!s.context.uri?.startsWith('spotify:album:'),
+    isLast: s.track_window.next_tracks.length === 0,
   };
 }
 
 const VOLUME_KEY = 'sleeve.volume';
-// Queuing a record: pause between songs, and how long a rate-limit wait we'll sit through before giving up.
-const QUEUE_GAP_MS = 300;
-const MAX_QUEUE_WAIT_SEC = 20;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [queueVersion, setQueueVersion] = useState(0);
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(null), 2600);
+    const t = setTimeout(() => setNotice(null), 2800);
     return () => clearTimeout(t);
   }, [notice]);
+  const lastRequest = useRef(0);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [volume, setVolumeState] = useState(() => {
     const v = Number(localStorage.getItem(VOLUME_KEY));
@@ -179,6 +173,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // Browsers only allow audio after a user gesture; this must run before any await.
       player.current?.activateElement();
       setError(null);
+      lastRequest.current = Date.now();
       try {
         const deviceId = await ensureDevice();
         player.current?.activateElement();
@@ -201,6 +196,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       player.current?.activateElement();
       setError(null);
+      lastRequest.current = Date.now();
       try {
         const deviceId = await ensureDevice();
         player.current?.activateElement();
@@ -213,60 +209,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [needsReconnect, nowPlaying?.trackId, ensureDevice],
   );
 
-  const queueTrack = useCallback(
-    async (trackId: string, title: string) => {
-      if (needsReconnect) return;
-      // Spotify can only queue onto something that's playing; with nothing on, just start the song.
-      if (!nowPlaying) return playTracks([trackId]);
-      setError(null);
-      try {
-        const deviceId = await ensureDevice();
-        await apiAddToQueue(deviceId, trackId);
-        setNotice(`Added “${title}” to the queue`);
-        setQueueVersion((v) => v + 1);
-      } catch (e) {
-        if (e instanceof RateLimitError) setError(e.message);
-        else setError(`Couldn’t add to the queue: ${(e as Error).message}`);
-      }
-    },
-    [needsReconnect, nowPlaying, playTracks, ensureDevice],
-  );
-
-  const queueRecord = useCallback(
-    async (albumId: string, trackIds: string[], title: string) => {
-      if (needsReconnect || !trackIds.length) return;
-      if (!nowPlaying) return playAlbum(albumId);
-      setError(null);
-      setNotice(`Adding “${title}” to the queue…`);
-      try {
-        const deviceId = await ensureDevice();
-        // Spotify only queues one song per request. Add them one after another (keeps their order),
-        // spaced out so a long record doesn't trip Spotify's rate limit; if it does, wait and carry on.
-        for (const [i, id] of trackIds.entries()) {
-          if (i > 0) await sleep(QUEUE_GAP_MS);
-          for (let attempt = 0; ; attempt++) {
-            try {
-              await apiAddToQueue(deviceId, id);
-              break;
-            } catch (e) {
-              if (!(e instanceof RateLimitError) || attempt >= 2 || e.retryAfterSec > MAX_QUEUE_WAIT_SEC) throw e;
-              setNotice(`Adding “${title}” to the queue… (${i} of ${trackIds.length})`);
-              await sleep(e.retryAfterSec * 1000 + 250);
-            }
-          }
-        }
-        setNotice(`Added ${trackIds.length} song${trackIds.length === 1 ? '' : 's'} from “${title}” to the queue`);
-      } catch (e) {
-        setNotice(null);
-        if (e instanceof RateLimitError) setError(e.message);
-        else setError(`Couldn’t add “${title}” to the queue: ${(e as Error).message}`);
-      } finally {
-        setQueueVersion((v) => v + 1);
-      }
-    },
-    [needsReconnect, nowPlaying, playAlbum, ensureDevice],
-  );
-
   const api = useMemo<PlayerApi>(
     () => ({
       status,
@@ -276,10 +218,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       volume,
       playAlbum,
       playTracks,
-      queueTrack,
-      queueRecord,
-      queueVersion,
+      lastPlayRequestAt: () => lastRequest.current,
       notice,
+      notify: setNotice,
       toggle: () => player.current?.togglePlay(),
       next: () => player.current?.nextTrack(),
       previous: () => player.current?.previousTrack(),
@@ -294,7 +235,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       },
       dismissError: () => setError(null),
     }),
-    [status, error, needsReconnect, nowPlaying, volume, playAlbum, playTracks, queueTrack, queueRecord, queueVersion, notice],
+    [status, error, needsReconnect, nowPlaying, volume, playAlbum, playTracks, notice],
   );
 
   return <PlayerContext.Provider value={api}>{children}</PlayerContext.Provider>;

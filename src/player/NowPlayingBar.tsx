@@ -1,9 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { login } from '../spotify/auth';
+import { Segmented } from '../components/Header';
+import { type EndMode, useAfterRecord } from './AfterRecord';
 import { usePlayer } from './PlayerContext';
-import { QueueIcon } from './QueueButton';
-import { UpNext } from './UpNext';
 
 const fmt = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -24,7 +24,6 @@ function useLivePosition(position: number, measuredAt: number, paused: boolean, 
 /** Floating player bar; appears once something has played and stays across tabs. */
 export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
   const { nowPlaying, error, dismissError, notice, toggle, next, previous, seek, volume, setVolume, status } = usePlayer();
-  const [showQueue, setShowQueue] = useState(false);
 
   return (
     <>
@@ -59,8 +58,6 @@ export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string,
         )}
       </AnimatePresence>
 
-      <AnimatePresence>{showQueue && nowPlaying && <UpNext onClose={() => setShowQueue(false)} />}</AnimatePresence>
-
       <AnimatePresence>
         {(nowPlaying || status === 'connecting') && (
           <motion.div
@@ -79,12 +76,13 @@ export function NowPlayingBar({ onOpenAlbum }: { onOpenAlbum?: (albumId: string,
                 onSeek={seek}
                 volume={volume}
                 onVolume={setVolume}
-                queueOpen={showQueue}
-                onQueue={() => setShowQueue((v) => !v)}
                 onOpen={
                   onOpenAlbum && nowPlaying.albumId ? () => onOpenAlbum(nowPlaying.albumId!, nowPlaying.trackId) : undefined
                 }
               />
+            ) : null}
+            {nowPlaying ? (
+              <AfterRecordSlot lastSong={nowPlaying.fromAlbum && nowPlaying.isLast} onOpenAlbum={onOpenAlbum} />
             ) : (
               <span className="np-connecting">Connecting to Spotify…</span>
             )}
@@ -104,8 +102,6 @@ function Bar({
   volume,
   onVolume,
   onOpen,
-  queueOpen,
-  onQueue,
 }: {
   np: NonNullable<ReturnType<typeof usePlayer>['nowPlaying']>;
   onToggle: () => void;
@@ -116,8 +112,6 @@ function Bar({
   onVolume: (v: number) => void;
   /** Open the playing album's detail view. */
   onOpen?: () => void;
-  queueOpen: boolean;
-  onQueue: () => void;
 }) {
   const pos = useLivePosition(np.position, np.measuredAt, np.paused, np.duration);
   const pct = np.duration ? (pos / np.duration) * 100 : 0;
@@ -160,15 +154,6 @@ function Bar({
         <button className="np-btn" onClick={onNext} aria-label="Next track">
           ⏭
         </button>
-        <button
-          className={`np-btn np-queue ${queueOpen ? 'is-on' : ''}`}
-          onClick={onQueue}
-          aria-label="Up next"
-          aria-expanded={queueOpen}
-          title="Up next"
-        >
-          <QueueIcon size={16} />
-        </button>
       </div>
 
       <div className="np-progress">
@@ -198,6 +183,61 @@ function Bar({
           aria-label="Volume"
         />
       </label>
+    </>
+  );
+}
+
+const END_MODES: { id: EndMode; label: string }[] = [
+  { id: 'stop', label: 'Stop' },
+  { id: 'crate', label: 'From the crate' },
+];
+
+/** The player's one slot for what comes after this record: on deck, a crate pick, or the choice. */
+function AfterRecordSlot({
+  lastSong,
+  onOpenAlbum,
+}: {
+  lastSong: boolean;
+  onOpenAlbum?: (albumId: string, trackId: string | null) => void;
+}) {
+  const { onDeck, setOnDeck, endMode, setEndMode, cratePick, reroll, skipCrate } = useAfterRecord();
+  const shown = onDeck ?? cratePick;
+  const label = lastSong ? 'Up next' : onDeck ? 'On deck' : 'From the crate';
+
+  return (
+    <>
+      <span className="np-divider" aria-hidden />
+      <div className="np-after">
+        {shown ? (
+          <>
+            <button className="np-after-record" onClick={() => onOpenAlbum?.(shown.id, null)} title={`Open ${shown.name}`}>
+              {shown.thumb ? <img src={shown.thumb} alt="" /> : <span className="np-after-cover" />}
+              <span className="np-after-text">
+                <span className={`np-after-label ${lastSong ? 'is-soon' : ''}`}>{label}</span>
+                <span className="np-after-title">{shown.name}</span>
+              </span>
+            </button>
+            {!onDeck && (
+              <button className="np-after-btn" onClick={reroll} title="Pick another record" aria-label="Pick another record">
+                ↻
+              </button>
+            )}
+            <button
+              className="np-after-btn"
+              onClick={() => (onDeck ? setOnDeck(null) : skipCrate())}
+              title={onDeck ? 'Take off deck' : 'Not this time'}
+              aria-label={onDeck ? 'Take off deck' : 'Skip the crate pick for this record'}
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <div className="np-after-choice">
+            <span className="np-after-label">When this record ends</span>
+            <Segmented small groupId="endMode" value={endMode} options={END_MODES} onChange={setEndMode} />
+          </div>
+        )}
+      </div>
     </>
   );
 }

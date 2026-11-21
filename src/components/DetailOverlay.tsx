@@ -2,9 +2,9 @@ import { motion } from 'framer-motion';
 import { isValidElement, useEffect, useRef } from 'react';
 import { useAlbumTracks } from '../hooks/useAlbumTracks';
 import { PlayButton } from '../player/PlayButton';
-import { AddToQueueButton, QueueIcon } from '../player/QueueButton';
 import { usePlayer } from '../player/PlayerContext';
 import { CollectButton } from './CollectButton';
+import { useAfterRecord } from '../player/AfterRecord';
 import { savedArtists, useSavedArtist } from '../collection/store';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { useTilt } from '../hooks/useTilt';
@@ -161,7 +161,6 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
                       </a>
                     )}
                     <span className="tl-dur">{t.duration}</span>
-                    {playable && t.id ? <AddToQueueButton trackId={t.id} title={t.title} className="tl-queue" /> : <span />}
                     {favArtist && t.id && (
                       <button
                         className={`tl-fav ${favIds.has(t.id) ? 'is-fav' : ''}`}
@@ -191,21 +190,7 @@ export function DetailOverlay({ item, onClose, onStep, onArtist }: Props) {
             ) : null,
             <div className="overlay-actions" key="l">
               {isPlayable(item) && <PlayButton albumId={item.albumId!} variant="large" />}
-              {playable && !item.tracks && tracklist?.some((t) => t.id) && (
-                <button
-                  className="btn-ghost btn-queue"
-                  onClick={() =>
-                    player.queueRecord(
-                      item.albumId!,
-                      tracklist.flatMap((t) => (t.id ? [t.id] : [])),
-                      item.title,
-                    )
-                  }
-                  title="Add every song on this record to the queue"
-                >
-                  <QueueIcon size={16} /> Add to queue
-                </button>
-              )}
+              {isPlayable(item) && item.record && <PlayNextButton record={item.record} />}
               {item.record && <CollectButton record={item.record} isSong={!!item.highlightTrackId} />}
               <a className="btn-ghost" href={item.url} target="_blank" rel="noreferrer">
                 Open in Spotify ↗
@@ -246,5 +231,42 @@ export function HeartIcon({ filled, size = 16 }: { filled?: boolean; size?: numb
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** Put this record on deck: it plays when the current record finishes. One slot, so it replaces any other. */
+function PlayNextButton({ record }: { record: NonNullable<ArtItem['record']> }) {
+  const { nowPlaying, needsReconnect, notify } = usePlayer();
+  const { onDeck, setOnDeck } = useAfterRecord();
+  // Nothing to follow, or it's the record that's already on: just use Play.
+  if (needsReconnect || !nowPlaying || nowPlaying.albumId === record.id) return null;
+  const isOnDeck = onDeck?.id === record.id;
+  return (
+    <button
+      className={`btn-ghost btn-deck ${isOnDeck ? 'is-on' : ''}`}
+      onClick={() => {
+        if (isOnDeck) {
+          setOnDeck(null);
+          notify(`Took “${record.name}” off deck`);
+          return;
+        }
+        notify(
+          onDeck
+            ? `On deck: “${record.name}” (replaces “${onDeck.name}”)`
+            : `On deck: “${record.name}” plays after this record`,
+        );
+        setOnDeck(record);
+      }}
+      title={isOnDeck ? 'Take off deck' : 'Play this record after the one that’s on'}
+    >
+      {isOnDeck ? (
+        <>
+          <span className="when-idle">✓ On deck</span>
+          <span className="when-hover">Take off deck</span>
+        </>
+      ) : (
+        '⤓ Play next'
+      )}
+    </button>
   );
 }

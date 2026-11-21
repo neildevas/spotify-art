@@ -7,6 +7,7 @@ import { Header, Segmented, type View } from './components/Header';
 import { LayoutModeContext } from './components/LayoutMode';
 import { NowPlayingBar } from './player/NowPlayingBar';
 import { PlayerProvider } from './player/PlayerContext';
+import { AfterRecordProvider } from './player/AfterRecord';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
 import { type LikeRow, LikesView } from './components/LikesView';
@@ -100,7 +101,9 @@ export default function App() {
   if (!authed) return <Login error={authError} />;
   return (
     <PlayerProvider>
-      <Wall onSignOut={signOut} />
+      <AfterRecordProvider>
+        <Wall onSignOut={signOut} />
+      </AfterRecordProvider>
     </PlayerProvider>
   );
 }

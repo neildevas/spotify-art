@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { type SavedArtist, savedArtists } from '../collection/store';
 import { usePlayer } from '../player/PlayerContext';
-import { AddToQueueButton } from '../player/QueueButton';
 import type { FavTrack } from '../spotify/types';
 import { HeartIcon } from './DetailOverlay';
 
@@ -71,7 +70,6 @@ export function FavTracks({ artist }: Props) {
                 <span className="fav-album">{t.albumName}</span>
               </span>
               <span className="fav-dur">{t.duration}</span>
-            <AddToQueueButton trackId={t.id} title={t.title} className="fav-queue" />
               {unfav(t)}
             </motion.li>
           ))}
