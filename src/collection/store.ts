@@ -94,27 +94,6 @@ export const collection = {
     if (records.some((r) => r.id === record.id)) this.remove(record.id);
     else this.add(record);
   },
-  /** JSON backup, since localStorage only lives in this browser. */
-  exportJson() {
-    return JSON.stringify({ app: 'sleeve', version: 2, records, artists }, null, 2);
-  },
-  /** Merges a backup in (records and saved artists); existing items are kept. Returns how many were new. */
-  importJson(text: string) {
-    const data = JSON.parse(text);
-    const incoming: CollectedRecord[] = Array.isArray(data) ? data : data?.records;
-    if (!Array.isArray(incoming)) throw new Error('Not a Sleeve collection file');
-    const have = new Set(records.map((r) => r.id));
-    const fresh = incoming.filter((r) => r && typeof r.id === 'string' && r.image && !have.has(r.id));
-    commit([...records, ...fresh].sort((a, b) => b.addedAt - a.addedAt));
-
-    const incomingArtists: SavedArtist[] = Array.isArray(data?.artists) ? data.artists : [];
-    const haveArtists = new Set(artists.map((a) => a.id));
-    const freshArtists = incomingArtists.filter((a) => a && typeof a.id === 'string' && a.name && !haveArtists.has(a.id));
-    if (freshArtists.length) commitArtists([...artists, ...freshArtists].sort((a, b) => b.addedAt - a.addedAt));
-    collectPinnedRecords();
-
-    return fresh.length + freshArtists.length;
-  },
 };
 
 export function useCollection() {

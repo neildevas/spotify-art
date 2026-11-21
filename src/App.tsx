@@ -38,7 +38,7 @@ import {
 import { handleCallback, hasSession, logout } from './spotify/auth';
 import type { AlbumGroup, Artist, ArtItem, TimeRange, User } from './spotify/types';
 
-type Sort = 'recent' | 'title' | 'artist' | 'year';
+type Sort = 'recent' | 'title' | 'artist' | 'custom' | 'year';
 type TrackMode = 'grouped' | 'tracks';
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -50,8 +50,17 @@ const TRACK_MODES: { id: TrackMode; label: string }[] = [
   { id: 'grouped', label: 'By album' },
   { id: 'tracks', label: 'By track' },
 ];
-function sortItems(items: ArtItem[], sort: Sort) {
+function sortItems(items: ArtItem[], sort: Sort, order: string[] = []) {
   if (sort === 'recent') return items;
+  if (sort === 'custom') {
+    // Your arrangement; records added since you last arranged come first, newest first.
+    const at = new Map(order.map((id, i) => [id, i]));
+    const rank = (r: ArtItem) => at.get(r.albumId ?? '') ?? -1;
+    return items
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i)
+      .map(({ r }) => r);
+  }
   const copy = [...items];
   if (sort === 'title') copy.sort((a, b) => a.title.localeCompare(b.title));
   if (sort === 'artist') copy.sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
@@ -120,6 +129,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [recordQuery, setRecordQuery] = useState('');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
   const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
+  // "Your order": the arrangement you've dragged the Records grid into (album ids, first to last).
+  const [collectionOrder, setCollectionOrder] = usePersisted<string[]>('sleeve.collectionOrder', []);
   const records = useCollection();
   const artistShelf = useSavedArtists();
   // Where the open artist page was reached from, so its back link returns there.
@@ -171,10 +182,10 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     const q = recordQuery.trim().toLowerCase();
     const all = records.map(recordToItem);
     const shown = q ? all.filter((r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)) : all;
-    return sortItems(shown, collectionSort);
-  }, [records, collectionSort, recordQuery]);
+    return sortItems(shown, collectionSort, collectionOrder);
+  }, [records, collectionSort, recordQuery, collectionOrder]);
   const sortedArtists = useMemo(
-    () => (collectionSort !== 'recent' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
+    () => (collectionSort !== 'recent' && collectionSort !== 'custom' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
     [artistShelf, collectionSort],
   );
 
@@ -341,6 +352,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onCollectArtist={collectArtist}
               onBrowse={() => setView('search')}
               onBrowseLikes={() => setView('likes')}
+              onArrange={setCollectionOrder}
             />
           ) : showLikes ? (
             <LikesView

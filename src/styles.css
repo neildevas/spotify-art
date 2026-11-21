@@ -869,3 +869,15 @@ img.np-link:hover { transform: scale(1.06); }
 .btn-deck.is-on { background: rgba(255,255,255,0.12); }
 .btn-deck.is-on:hover .when-idle { display: none; }
 .btn-deck.is-on:hover .when-hover { display: inline; }
+
+/* ---------- Records: artist dividers and arranging ---------- */
+.grid-ordered { grid-auto-flow: row; } /* keep the exact order (no back-filling gaps) */
+.grid-divider {
+  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 12px;
+  padding: 18px 0 2px; border-bottom: 1px solid var(--line); margin-bottom: 2px;
+}
+.grid-divider:first-child { padding-top: 0; }
+.grid-divider-name { font-family: var(--serif); font-size: clamp(22px, calc(var(--tile, 180px) * 0.15), 34px); line-height: 1.1; color: var(--fg); }
+.grid-arrange .tile { cursor: grab; }
+.grid-arrange .tile:active { cursor: grabbing; }
+.tile-dragging { opacity: 0.35; }
