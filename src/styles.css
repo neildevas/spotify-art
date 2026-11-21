@@ -883,6 +883,22 @@ img.np-link:hover { transform: scale(1.06); }
 .np-play-now { flex-shrink: 0; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .np-play-now:hover { background: #fff; }
 .btn-small { height: 32px; padding: 0 14px; font-size: 12px; }
+.picker { display: flex; flex-direction: column; gap: 12px; }
+.picker-filter {
+  height: 36px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; color: var(--fg);
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+}
+.picker-filter::placeholder { color: var(--fg-faint); }
+.picker-filter:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+.picker-grid {
+  list-style: none; margin: 0; padding: 2px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  max-height: 248px; overflow-y: auto;
+}
+.picker-tile { display: block; width: 100%; aspect-ratio: 1; padding: 0; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.06); transition: transform 0.15s, box-shadow 0.15s; }
+.picker-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.picker-tile:hover, .picker-tile:focus-visible { transform: scale(1.05); box-shadow: 0 0 0 2px var(--fg); outline: none; }
+.picker-blank { display: grid; place-items: center; height: 100%; padding: 4px; font-size: 10px; color: var(--fg-dim); text-align: center; }
+.picker-back { align-self: flex-start; padding: 0; font-size: 12px; }
 @media (max-width: 760px) {
   /* Panel spans the player's width, just above it */
   .np-suggest { position: static; }

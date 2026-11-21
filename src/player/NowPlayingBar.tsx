@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { login } from '../spotify/auth';
+import { useCollection } from '../collection/store';
+import type { RecordInfo } from '../spotify/types';
 import { useAfterRecord } from './AfterRecord';
 import { usePlayer } from './PlayerContext';
 
@@ -199,21 +201,32 @@ const SparkIcon = () => (
  */
 function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackId: string | null) => void }) {
   const { playAlbum } = usePlayer();
-  const { cratePick: pick, reroll } = useAfterRecord();
+  const { cratePick: pick, reroll, choose } = useAfterRecord();
   const [open, setOpen] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Closing the panel also leaves the picker.
+  useEffect(() => {
+    if (!open) setChoosing(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    // Esc backs out of choosing first, then closes the panel.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (choosing) setChoosing(false);
+      else setOpen(false);
+    };
     window.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, choosing]);
 
   return (
     <div className="np-suggest" ref={ref}>
@@ -240,9 +253,17 @@ function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackI
           >
             <div className="suggest-head">
               <span className="eyebrow">Suggested next</span>
-              <span className="suggest-from">from your collection</span>
+              <span className="suggest-from">{choosing ? 'choose a record' : 'from your collection'}</span>
             </div>
-            {pick ? (
+            {choosing ? (
+              <RecordPicker
+                onPick={(r) => {
+                  choose(r);
+                  setChoosing(false);
+                }}
+                onBack={() => setChoosing(false)}
+              />
+            ) : pick ? (
               <>
                 <button
                   className="suggest-record"
@@ -274,6 +295,9 @@ function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackI
                   <button className="btn-ghost btn-small" onClick={reroll}>
                     ↻ Another
                   </button>
+                  <button className="btn-ghost btn-small" onClick={() => setChoosing(true)}>
+                    Choose…
+                  </button>
                 </div>
               </>
             ) : (
@@ -282,6 +306,53 @@ function SuggestButton({ onOpenAlbum }: { onOpenAlbum?: (albumId: string, trackI
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** A small, filterable grid of your records' covers; click one to make it the suggestion. */
+function RecordPicker({ onPick, onBack }: { onPick: (r: RecordInfo) => void; onBack: () => void }) {
+  const records = useCollection();
+  const { nowPlaying } = usePlayer();
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const shown = records.filter(
+    (r) =>
+      r.id !== nowPlaying?.albumId &&
+      (!q || r.name.toLowerCase().includes(q) || r.artists.some((a) => a.name.toLowerCase().includes(q))),
+  );
+  return (
+    <div className="picker">
+      <input
+        className="picker-filter"
+        type="search"
+        autoFocus
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Find a record in your collection"
+        aria-label="Find a record in your collection"
+      />
+      {shown.length ? (
+        <ul className="picker-grid">
+          {shown.map((r) => (
+            <li key={r.id}>
+              <button
+                className="picker-tile"
+                onClick={() => onPick(r)}
+                title={`${r.name} · ${r.artists.map((a) => a.name).join(', ')}`}
+                aria-label={`Choose ${r.name}`}
+              >
+                {r.thumb ? <img src={r.thumb} alt="" loading="lazy" /> : <span className="picker-blank">{r.name}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="suggest-empty">Nothing matches “{query}”.</p>
+      )}
+      <button className="text-btn picker-back" onClick={onBack}>
+        ← Back to the suggestion
+      </button>
     </div>
   );
 }

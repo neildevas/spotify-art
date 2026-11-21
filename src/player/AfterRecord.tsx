@@ -11,6 +11,8 @@ type AfterRecordApi = {
   /** A record from your collection you haven't played in a while. */
   cratePick: RecordInfo | null;
   reroll: () => void;
+  /** Put a record of your own choosing in the suggestion's place (stays until you play it or press ↻). */
+  choose: (r: RecordInfo) => void;
 };
 
 const PLAYED_KEY = 'sleeve.lastPlayed';
@@ -65,6 +67,7 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const records = useCollection();
   const [cratePick, setCratePick] = useState<RecordInfo | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
+  const chosen = useRef(false);
   const lastPlayed = useRef<Record<string, number>>(readJson(PLAYED_KEY, {}));
   const seen = useRef<string[]>([]);
 
@@ -85,7 +88,11 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!currentId) return;
     setCratePick((prev) => {
-      if (rerollToken === 0 && prev && prev.id !== currentId && records.some((r) => r.id === prev.id)) return prev;
+      const stillThere = prev && prev.id !== currentId && records.some((r) => r.id === prev.id);
+      // A record you chose yourself stays put until it's playing (or you ask for another).
+      if (chosen.current && stillThere) return prev;
+      chosen.current = false;
+      if (rerollToken === 0 && stillThere) return prev;
       const next = pickFromCrate(records, currentId, lastPlayed.current, seen.current);
       if (next) seen.current = [...seen.current.filter((id) => id !== next.id), next.id].slice(-NO_REPEAT);
       return next;
@@ -95,7 +102,14 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const api = useMemo<AfterRecordApi>(
     () => ({
       cratePick,
-      reroll: () => setRerollToken((n) => n + 1),
+      reroll: () => {
+        chosen.current = false;
+        setRerollToken((n) => n + 1);
+      },
+      choose: (r: RecordInfo) => {
+        chosen.current = true;
+        setCratePick(r);
+      },
     }),
     [cratePick],
   );
