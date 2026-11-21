@@ -46,13 +46,25 @@ function writeJson(key: string, value: unknown) {
   }
 }
 
-/** Favour records you haven't played in a while (never the one that's on). */
-function pickFromCrate(records: RecordInfo[], currentId: string | null, lastPlayed: Record<string, number>, avoid?: string) {
-  const pool = records.filter((r) => r.id !== currentId && r.id !== avoid);
-  if (!pool.length) return null;
-  const oldestFirst = [...pool].sort((a, b) => (lastPlayed[a.id] ?? 0) - (lastPlayed[b.id] ?? 0));
-  const shortlist = oldestFirst.slice(0, Math.max(3, Math.ceil(pool.length / 3)));
-  return shortlist[Math.floor(Math.random() * shortlist.length)];
+// Records played in Sleeve within this window sit out of the crate (unless that's all there is).
+const RECENT_MS = 14 * 24 * 60 * 60 * 1000;
+// Don't offer the same record again until this many other picks have been shown.
+const NO_REPEAT = 8;
+
+/**
+ * A random record from your whole collection, skipping the one that's on, anything you've played
+ * in the last two weeks, and the last few picks you've seen (so ↻ keeps showing new ones).
+ */
+function pickFromCrate(records: RecordInfo[], currentId: string | null, lastPlayed: Record<string, number>, seen: string[]) {
+  const others = records.filter((r) => r.id !== currentId);
+  if (!others.length) return null;
+  const now = Date.now();
+  const notRecent = others.filter((r) => now - (lastPlayed[r.id] ?? 0) > RECENT_MS);
+  const base = notRecent.length ? notRecent : others;
+  const fresh = base.filter((r) => !seen.includes(r.id));
+  const pool = fresh.length ? fresh : base.filter((r) => r.id !== seen[seen.length - 1]);
+  const from = pool.length ? pool : base;
+  return from[Math.floor(Math.random() * from.length)];
 }
 
 const Ctx = createContext<AfterRecordApi | null>(null);
@@ -73,6 +85,8 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const [skippedFor, setSkippedFor] = useState<string | null>(null);
   const [rerollToken, setRerollToken] = useState(0);
   const lastPlayed = useRef<Record<string, number>>(readJson(PLAYED_KEY, {}));
+  // Recent crate picks this session, so re-rolling moves through the collection instead of circling.
+  const seen = useRef<string[]>([]);
 
   const setOnDeck = useCallback((r: RecordInfo | null) => {
     setOnDeckState(r);
@@ -99,11 +113,12 @@ export function AfterRecordProvider({ children }: { children: React.ReactNode })
   const recordIds = records.map((r) => r.id).join(',');
   useEffect(() => {
     if (endMode !== 'crate' || onDeck || !currentId) return setCratePick(null);
-    setCratePick((prev) =>
-      rerollToken === 0 && prev && prev.id !== currentId && records.some((r) => r.id === prev.id)
-        ? prev
-        : pickFromCrate(records, currentId, lastPlayed.current, prev?.id),
-    );
+    setCratePick((prev) => {
+      if (rerollToken === 0 && prev && prev.id !== currentId && records.some((r) => r.id === prev.id)) return prev;
+      const next = pickFromCrate(records, currentId, lastPlayed.current, seen.current);
+      if (next) seen.current = [...seen.current.filter((id) => id !== next.id), next.id].slice(-NO_REPEAT);
+      return next;
+    });
   }, [endMode, onDeck, currentId, recordIds, rerollToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const crateActive = endMode === 'crate' && !onDeck && skippedFor !== currentId;
