@@ -873,16 +873,26 @@ img.np-link:hover { transform: scale(1.06); }
 .suggest-head .eyebrow { margin: 0; font-size: 11px; }
 .suggest-from { font-size: 12px; color: var(--fg-faint); }
 .suggest-record { display: flex; gap: 14px; align-items: center; padding: 0; text-align: left; color: var(--fg); }
-.suggest-record img, .suggest-cover { width: 84px; height: 84px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); box-shadow: 0 10px 24px -10px rgba(0,0,0,0.9); }
+.suggest-record img, .suggest-cover { width: 64px; height: 64px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.08); box-shadow: 0 10px 24px -10px rgba(0,0,0,0.9); }
 .suggest-record:hover .suggest-title { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
 .suggest-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.suggest-title { font-family: var(--serif); font-size: 24px; line-height: 1.05; }
+.suggest-title { font-family: var(--serif); font-size: 22px; line-height: 1.05; }
 .suggest-sub { font-size: 12px; color: var(--fg-dim); }
 .suggest-actions { display: flex; gap: 8px; }
 .suggest-empty { margin: 0; font-size: 13px; color: var(--fg-dim); line-height: 1.5; }
 .np-play-now { flex-shrink: 0; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .np-play-now:hover { background: #fff; }
 .btn-small { height: 32px; padding: 0 14px; font-size: 12px; }
+.btn-icon { width: 32px; padding: 0; justify-content: center; }
+/* While the What's next? panel is open, toasts move to the top so they don't cover it */
+body:has(.suggest-panel) .player-toast { bottom: auto; top: 88px; }
+.suggest-section { display: flex; flex-direction: column; gap: 10px; }
+.suggest-section + .suggest-section { padding-top: 14px; border-top: 1px solid var(--line); }
+.suggest-kind { font-size: 11px; color: var(--fg-faint); }
+.np-suggest-btn.has-saved { padding-left: 6px; }
+.np-suggest-thumb { width: 22px; height: 22px; border-radius: 3px; object-fit: cover; }
+.deck-state { display: inline-flex; align-items: center; gap: 10px; }
+.deck-badge { font-size: 14px; font-weight: 600; color: var(--fg); padding: 0 4px; white-space: nowrap; }
 @media (max-width: 760px) {
   /* Panel spans the player's width, just above it */
   .np-suggest { position: static; }
