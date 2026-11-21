@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { RateLimitError, playAlbum as apiPlayAlbum, playTracks as apiPlayTracks } from '../spotify/api';
+import { RateLimitError, playAlbum as apiPlayAlbum } from '../spotify/api';
 import { PLAYBACK_SCOPES, getAccessToken, hasScopes } from '../spotify/auth';
 
 /**
@@ -20,6 +20,10 @@ export type NowPlaying = {
   duration: number;
   /** When `position` was measured, for smooth progress between SDK updates. */
   measuredAt: number;
+  /** Playing a whole record (album context), not a list of songs. */
+  fromAlbum: boolean;
+  /** The record's last song: nothing from this album comes next (Spotify may still line up its own suggestions). */
+  isLast: boolean;
 };
 
 type Status = 'idle' | 'connecting' | 'ready' | 'error';
@@ -32,8 +36,9 @@ type PlayerApi = {
   nowPlaying: NowPlaying | null;
   volume: number;
   playAlbum: (albumId: string, trackIndex?: number) => Promise<void>;
-  /** Play a list of songs in order, starting at `index`. */
-  playTracks: (trackIds: string[], index?: number) => Promise<void>;
+  /** A short, friendly confirmation that clears itself. */
+  notice: string | null;
+  notify: (message: string) => void;
   toggle: () => void;
   next: () => void;
   previous: () => void;
@@ -85,6 +90,10 @@ function toNowPlaying(s: Spotify.PlaybackState): NowPlaying {
     position: s.position,
     duration: s.duration,
     measuredAt: Date.now(),
+    fromAlbum: !!s.context.uri?.startsWith('spotify:album:'),
+    // With Autoplay on, Spotify lists its own picks as "next" after an album's final song, so look for
+    // more songs from this album rather than an empty list.
+    isLast: !s.track_window.next_tracks.some((n) => n.album?.uri && n.album.uri === t.album.uri),
   };
 }
 
@@ -93,6 +102,12 @@ const VOLUME_KEY = 'sleeve.volume';
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 2800);
+    return () => clearTimeout(t);
+  }, [notice]);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [volume, setVolumeState] = useState(() => {
     const v = Number(localStorage.getItem(VOLUME_KEY));
@@ -167,28 +182,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [needsReconnect, nowPlaying?.albumId, ensureDevice],
   );
 
-  const playTracks = useCallback(
-    async (trackIds: string[], index = 0) => {
-      if (needsReconnect || !trackIds.length) return;
-      // Same song already loaded: just pause/resume.
-      if (nowPlaying?.trackId === trackIds[index] && player.current) {
-        player.current.togglePlay();
-        return;
-      }
-      player.current?.activateElement();
-      setError(null);
-      try {
-        const deviceId = await ensureDevice();
-        player.current?.activateElement();
-        await apiPlayTracks(deviceId, trackIds, index);
-      } catch (e) {
-        if (e instanceof RateLimitError) setError(e.message);
-        else if (!(e as { fromPlayer?: boolean }).fromPlayer) setError(`Couldn’t start playback: ${(e as Error).message}`);
-      }
-    },
-    [needsReconnect, nowPlaying?.trackId, ensureDevice],
-  );
-
   const api = useMemo<PlayerApi>(
     () => ({
       status,
@@ -197,7 +190,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       nowPlaying,
       volume,
       playAlbum,
-      playTracks,
+      notice,
+      notify: setNotice,
       toggle: () => player.current?.togglePlay(),
       next: () => player.current?.nextTrack(),
       previous: () => player.current?.previousTrack(),
@@ -212,7 +206,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       },
       dismissError: () => setError(null),
     }),
-    [status, error, needsReconnect, nowPlaying, volume, playAlbum, playTracks],
+    [status, error, needsReconnect, nowPlaying, volume, playAlbum, notice],
   );
 
   return <PlayerContext.Provider value={api}>{children}</PlayerContext.Provider>;

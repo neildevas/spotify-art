@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { collection, useInCollection } from '../collection/store';
 import { useTilt } from '../hooks/useTilt';
 import { PlayButton } from '../player/PlayButton';
@@ -14,6 +14,9 @@ type Props = {
   tileWidth: number;
   collectToggle?: boolean;
   onCollectArtist?: (artist: { id: string; name: string }) => void;
+  /** Drag-to-arrange handlers from the grid (Records → Your order). */
+  reorder?: { start: (key: string) => void; over: (key: string, after: boolean) => void; end: () => void };
+  dragging?: boolean;
 };
 
 export const ArtTile = memo(function ArtTile({
@@ -23,8 +26,43 @@ export const ArtTile = memo(function ArtTile({
   tileWidth,
   collectToggle,
   onCollectArtist,
+  reorder,
+  dragging,
 }: Props) {
   const [loaded, setLoaded] = useState(false);
+  const liRef = useRef<HTMLLIElement>(null);
+  const reorderRef = useRef(reorder);
+  reorderRef.current = reorder;
+
+  // Native drag and drop, wired by hand: framer-motion claims the onDrag* props for its own gestures.
+  const canReorder = !!reorder;
+  useEffect(() => {
+    const el = liRef.current;
+    if (!el || !canReorder) return;
+    const onStart = (e: DragEvent) => {
+      e.dataTransfer?.setData('text/plain', item.key);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      reorderRef.current?.start(item.key);
+    };
+    const onOver = (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      const r = el.getBoundingClientRect();
+      reorderRef.current?.over(item.key, e.clientX > r.left + r.width / 2);
+    };
+    const onDrop = (e: DragEvent) => e.preventDefault();
+    const onEnd = () => reorderRef.current?.end();
+    el.addEventListener('dragstart', onStart);
+    el.addEventListener('dragover', onOver);
+    el.addEventListener('drop', onDrop);
+    el.addEventListener('dragend', onEnd);
+    return () => {
+      el.removeEventListener('dragstart', onStart);
+      el.removeEventListener('dragover', onOver);
+      el.removeEventListener('drop', onDrop);
+      el.removeEventListener('dragend', onEnd);
+    };
+  }, [canReorder, item.key]);
 
   const { rotateX, rotateY, glare, handlers, reset } = useTilt(9);
 
@@ -38,7 +76,9 @@ export const ArtTile = memo(function ArtTile({
 
   return (
     <motion.li
-      className={`tile${featured ? ' tile-featured' : ''}${isPlayable(item) ? ' tile-playable' : ''}`}
+      ref={liRef}
+      draggable={canReorder || undefined}
+      className={`tile${featured ? ' tile-featured' : ''}${isPlayable(item) ? ' tile-playable' : ''}${dragging ? ' tile-dragging' : ''}`}
       layout="position"
       initial={{ opacity: 0, y: 18, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}

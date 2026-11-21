@@ -138,7 +138,13 @@ async function spotify<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
   if (!res.ok) throw new Error(`Spotify ${res.status}: ${await res.text()}`);
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T;
   const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Some write endpoints answer 200 with a non-JSON body: that's still a success.
+    return undefined as T;
+  }
 }
 
 /** Cached GET. Same path = same request, shared and reused until it's older than `ttlMs`. */
@@ -158,7 +164,6 @@ export const playAlbum = (deviceId: string, albumId: string, position = 0) =>
     body: { context_uri: `spotify:album:${albumId}`, offset: { position } },
   });
 
-/** Play a list of songs (e.g. an artist's favourites) in order, starting at `position`. */
 export const playTracks = (deviceId: string, trackIds: string[], position = 0) =>
   spotify<void>(`/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
     method: 'PUT',
@@ -301,16 +306,16 @@ export function albumToItem({ album, added_at }: SavedAlbum): ArtItem {
 }
 
 /**
- * A record from your liked songs: the album, with every song you've liked on it marked and the
- * most recently liked one highlighted when it opens.
+ * A liked song's record, opened from Liked songs: the album, with that song highlighted and every
+ * song you've liked on it marked.
  */
-export function likedRecordToItem(album: Album, likedOnAlbum: string[]): ArtItem {
+export function likedSongToItem(album: Album, trackId: string, likedOnAlbum: string[]): ArtItem {
   const base = artistAlbumToItem(album);
   const n = likedOnAlbum.length;
   return {
     ...base,
-    key: `liked-${album.id}`,
-    highlightTrackId: likedOnAlbum[0],
+    key: `liked-${trackId}`,
+    highlightTrackId: trackId,
     likedTrackIds: likedOnAlbum,
     details: [...base.details, `♥ ${n} liked song${n === 1 ? '' : 's'}`],
   };

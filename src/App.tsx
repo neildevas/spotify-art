@@ -1,15 +1,16 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArtGrid } from './components/ArtGrid';
-import { type CollectionShelf, type CollectionSort, CollectionView } from './components/CollectionView';
+import { type ArtistsSort, type CollectionShelf, CollectionView, type RecordsView } from './components/CollectionView';
 import { DetailOverlay } from './components/DetailOverlay';
 import { Header, Segmented, type View } from './components/Header';
 import { LayoutModeContext } from './components/LayoutMode';
 import { NowPlayingBar } from './player/NowPlayingBar';
 import { PlayerProvider } from './player/PlayerContext';
+import { AfterRecordProvider } from './player/AfterRecord';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
-import { LikesView } from './components/LikesView';
+import { type LikeRow, LikesView } from './components/LikesView';
 import { clearLikes, useLikes } from './hooks/useLikes';
 import {
   type SearchFilter,
@@ -26,7 +27,7 @@ import {
   getArtist,
   isPlayable,
   artistRecordItems,
-  likedRecordToItem,
+  likedSongToItem,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -37,7 +38,6 @@ import {
 import { handleCallback, hasSession, logout } from './spotify/auth';
 import type { AlbumGroup, Artist, ArtItem, TimeRange, User } from './spotify/types';
 
-type Sort = 'recent' | 'title' | 'artist' | 'year';
 type TrackMode = 'grouped' | 'tracks';
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -49,13 +49,18 @@ const TRACK_MODES: { id: TrackMode; label: string }[] = [
   { id: 'grouped', label: 'By album' },
   { id: 'tracks', label: 'By track' },
 ];
-function sortItems(items: ArtItem[], sort: Sort) {
-  if (sort === 'recent') return items;
-  const copy = [...items];
-  if (sort === 'title') copy.sort((a, b) => a.title.localeCompare(b.title));
-  if (sort === 'artist') copy.sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
-  if (sort === 'year') copy.sort((a, b) => b.year.localeCompare(a.year));
-  return copy;
+/** Records in your order (newest first until you rearrange), or by artist name then year. */
+function sortItems(items: ArtItem[], sort: 'custom' | 'artist', order: string[] = []) {
+  if (sort === 'artist') {
+    return [...items].sort((a, b) => a.subtitle.localeCompare(b.subtitle) || a.year.localeCompare(b.year));
+  }
+  // Your arrangement; records added since you last arranged come first, newest first.
+  const at = new Map(order.map((id, i) => [id, i]));
+  const rank = (r: ArtItem) => at.get(r.albumId ?? '') ?? -1;
+  return items
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => rank(a.r) - rank(b.r) || a.i - b.i)
+    .map(({ r }) => r);
 }
 
 function usePersisted<T>(key: string, initial: T) {
@@ -100,7 +105,9 @@ export default function App() {
   if (!authed) return <Login error={authError} />;
   return (
     <PlayerProvider>
-      <Wall onSignOut={signOut} />
+      <AfterRecordProvider>
+        <Wall onSignOut={signOut} />
+      </AfterRecordProvider>
     </PlayerProvider>
   );
 }
@@ -116,7 +123,11 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Quick filter on the Records grid (album or artist); not remembered between visits.
   const [recordQuery, setRecordQuery] = useState('');
   const [range, setRange] = usePersisted<TimeRange>('sleeve.range', 'short_term');
-  const [collectionSort, setCollectionSort] = usePersisted<CollectionSort>('sleeve.collectionSort', 'recent');
+  // Records: your own order (newest on top until you rearrange) or grouped by artist. Artists sort separately.
+  const [recordsView, setRecordsView] = usePersisted<RecordsView>('sleeve.recordsView', 'order');
+  const [artistsSort, setArtistsSort] = usePersisted<ArtistsSort>('sleeve.artistsSort', 'recent');
+  // "Your order": the arrangement you've dragged the Records grid into (album ids, first to last).
+  const [collectionOrder, setCollectionOrder] = usePersisted<string[]>('sleeve.collectionOrder', []);
   const records = useCollection();
   const artistShelf = useSavedArtists();
   // Where the open artist page was reached from, so its back link returns there.
@@ -125,7 +136,6 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = usePersisted<SearchFilter>('sleeve.searchFilter', 'all');
-  const [hideOwned, setHideOwned] = usePersisted('sleeve.likesHideOwned', false);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [selected, setSelected] = useState<ArtItem | null>(null);
@@ -144,31 +154,23 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Your records by the open artist come first on their page (and in the overlay's ← → order).
   const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
 
-  // Records from your Spotify liked songs (Collection → From your likes).
+  // Liked songs: a Spotify extra behind the profile menu. Back returns to whichever tab you came from.
+  const [likesBackTo, setLikesBackTo] = useState<View>('collection');
   const showLikes = view === 'likes' && !artist;
   const likes = useLikes(showLikes, onSignOut);
-  const ownedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
-  // One tile per record, in the order of its most recent liked song. Likes arrive newest first, so a
-  // record's place is fixed the first time it shows up: later pages only add records at the end.
-  const likedRecords = useMemo(() => {
-    const byAlbum = new Map<string, string[]>();
+  const likeRows = useMemo<LikeRow[]>(() => {
+    const likedOnAlbum = new Map<string, string[]>();
     for (const l of likes.likes) {
-      const ids = byAlbum.get(l.albumId);
+      const ids = likedOnAlbum.get(l.albumId);
       if (ids) ids.push(l.trackId);
-      else byAlbum.set(l.albumId, [l.trackId]);
+      else likedOnAlbum.set(l.albumId, [l.trackId]);
     }
-    return [...byAlbum].filter(([id]) => likes.albums[id]).map(([id, ids]) => likedRecordToItem(likes.albums[id], ids));
+    return likes.likes
+      .filter((l) => likes.albums[l.albumId])
+      .map((like) => ({ like, item: likedSongToItem(likes.albums[like.albumId], like.trackId, likedOnAlbum.get(like.albumId)!) }));
   }, [likes.likes, likes.albums]);
-  const likedItems = useMemo(
-    () => (hideOwned ? likedRecords.filter((r) => !ownedIds.has(r.albumId!)) : likedRecords),
-    [likedRecords, ownedIds, hideOwned],
-  );
-  const likesStats = {
-    songs: likes.likes.length,
-    records: likedRecords.length,
-    missing: likedRecords.filter((r) => !ownedIds.has(r.albumId!)).length,
-    total: likes.total,
-  };
+  const likedItems = useMemo(() => likeRows.map((r) => r.item), [likeRows]);
+
 
 
 
@@ -177,11 +179,11 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
     const q = recordQuery.trim().toLowerCase();
     const all = records.map(recordToItem);
     const shown = q ? all.filter((r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)) : all;
-    return sortItems(shown, collectionSort);
-  }, [records, collectionSort, recordQuery]);
+    return sortItems(shown, recordsView === 'artist' ? 'artist' : 'custom', collectionOrder);
+  }, [records, recordsView, recordQuery, collectionOrder]);
   const sortedArtists = useMemo(
-    () => (collectionSort !== 'recent' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
-    [artistShelf, collectionSort],
+    () => (artistsSort === 'name' ? [...artistShelf].sort((a, b) => a.name.localeCompare(b.name)) : artistShelf),
+    [artistShelf, artistsSort],
   );
 
   const trackItems = useMemo(
@@ -272,8 +274,8 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   );
   const close = useCallback(() => setSelected(null), []);
 
-  /** Clicking the player's cover or title opens the album that's playing, on the song that's playing. */
-  const openPlayingAlbum = useCallback(
+  /** Open a record's album view by id (from the player, a suggestion or a favourite track), on a song if given. */
+  const openAlbum = useCallback(
     (albumId: string, trackId: string | null) => {
       const onPage = items.find((x) => x.albumId === albumId && isPlayable(x));
       const show = (item: ArtItem) => setSelected({ ...item, highlightTrackId: trackId ?? undefined });
@@ -295,14 +297,20 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
           onView={(v) => {
             setSelected(null);
             // An artist page opened from the Collection belongs to that visit; leaving the tab closes it.
-            // Likes never shows an artist page, so going there closes one too.
-            if (artistOrigin === 'collection' || v === 'likes') setArtist(null);
+            if (artistOrigin === 'collection') setArtist(null);
             setView(v);
           }}
           tileSize={tileSize}
           onTileSize={setTileSize}
           user={user}
           onLogout={onSignOut}
+          onLikedSongs={() => {
+            setSelected(null);
+            setArtist(null);
+            if (view !== 'likes') setLikesBackTo(view);
+            setView('likes');
+            window.scrollTo({ top: 0 });
+          }}
         />
 
         <main className="main" style={{ '--tile': `${tileSize}px` } as React.CSSProperties}>
@@ -322,6 +330,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               albums={artistAlbums}
               tileSize={tileSize}
               onSelect={setSelected}
+              onOpenAlbum={openAlbum}
               backLabel="Collection"
             />
           ) : view === 'collection' ? (
@@ -333,26 +342,28 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               onQuery={setRecordQuery}
               shelf={collectionShelf}
               onShelf={setCollectionShelf}
-              sort={collectionSort}
-              onSort={setCollectionSort}
+              recordsView={recordsView}
+              onRecordsView={setRecordsView}
+              artistsSort={artistsSort}
+              onArtistsSort={setArtistsSort}
               tileSize={tileSize}
               onSelect={setSelected}
               onOpenArtist={openSavedArtistFresh}
               onCollectArtist={collectArtist}
               onBrowse={() => setView('search')}
               onBrowseLikes={() => setView('likes')}
+              onArrange={setCollectionOrder}
             />
           ) : showLikes ? (
             <LikesView
-              items={likedItems}
-              stats={likesStats}
-              tileSize={tileSize}
+              rows={likeRows}
+              total={likes.total}
               loading={likes.loading}
               refreshing={likes.refreshing}
               error={likes.error}
-              hideOwned={hideOwned}
-              onHideOwned={setHideOwned}
-              onSelect={setSelected}
+              backLabel={likesBackTo === 'search' ? 'Search' : 'Collection'}
+              onBack={() => setView(likesBackTo === 'search' ? 'search' : 'collection')}
+              onOpenRecord={setSelected}
               onRefresh={likes.refresh}
             />
           ) : view === 'search' || view === 'likes' ? (
@@ -371,6 +382,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
               albums={artistAlbums}
               tileSize={tileSize}
               onSelect={setSelected}
+              onOpenAlbum={openAlbum}
             />
           ) : (
             <>
@@ -412,7 +424,7 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
         <AnimatePresence>
           {selected && <DetailOverlay key="overlay" item={selected} onClose={close} onStep={step} onArtist={openArtist} />}
         </AnimatePresence>
-        <NowPlayingBar onOpenAlbum={openPlayingAlbum} />
+        <NowPlayingBar onOpenAlbum={openAlbum} />
       </LayoutGroup>
     </LayoutModeContext.Provider>
   );

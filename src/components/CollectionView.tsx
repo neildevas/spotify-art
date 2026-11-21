@@ -1,23 +1,22 @@
 import { motion } from 'framer-motion';
-import { useRef, useState } from 'react';
-import { type SavedArtist, collection } from '../collection/store';
+import type { SavedArtist } from '../collection/store';
 import type { ArtItem } from '../spotify/types';
 import { ArtGrid } from './ArtGrid';
 import { ArtistCards } from './ArtistCards';
 import { Segmented } from './Header';
 
-export type CollectionSort = 'recent' | 'title' | 'artist' | 'year';
+/** Records: your own order (newest on top until you move things), or grouped by artist. */
+export type RecordsView = 'order' | 'artist';
+export type ArtistsSort = 'recent' | 'name';
 export type CollectionShelf = 'records' | 'artists';
 
-const RECORD_SORTS: { id: CollectionSort; label: string }[] = [
-  { id: 'recent', label: 'Recently added' },
-  { id: 'title', label: 'Album' },
-  { id: 'artist', label: 'Artist' },
+const RECORD_VIEWS: { id: RecordsView; label: string }[] = [
+  { id: 'order', label: 'Albums' },
+  { id: 'artist', label: 'By artist' },
 ];
-// Artists only have a name to sort by; any non-"recent" choice sorts them A–Z.
-const ARTIST_SORTS: { id: CollectionSort; label: string }[] = [
+const ARTIST_SORTS: { id: ArtistsSort; label: string }[] = [
   { id: 'recent', label: 'Recently added' },
-  { id: 'artist', label: 'Name' },
+  { id: 'name', label: 'Name' },
 ];
 
 type Props = {
@@ -28,8 +27,10 @@ type Props = {
   onQuery: (q: string) => void;
   shelf: CollectionShelf;
   onShelf: (s: CollectionShelf) => void;
-  sort: CollectionSort;
-  onSort: (s: CollectionSort) => void;
+  recordsView: RecordsView;
+  onRecordsView: (v: RecordsView) => void;
+  artistsSort: ArtistsSort;
+  onArtistsSort: (s: ArtistsSort) => void;
   tileSize: number;
   onSelect: (item: ArtItem) => void;
   onOpenArtist: (a: SavedArtist) => void;
@@ -37,6 +38,8 @@ type Props = {
   onBrowse: () => void;
   /** Go to the Likes tab (records from your Spotify liked songs). */
   onBrowseLikes: () => void;
+  /** "Your order": save a new arrangement (record album ids, first to last). */
+  onArrange: (albumIds: string[]) => void;
 };
 
 /**
@@ -51,37 +54,20 @@ export function CollectionView({
   onQuery,
   shelf,
   onShelf,
-  sort,
-  onSort,
+  recordsView,
+  onRecordsView,
+  artistsSort,
+  onArtistsSort,
   tileSize,
   onSelect,
   onOpenArtist,
   onCollectArtist,
   onBrowse,
   onBrowseLikes,
+  onArrange,
 }: Props) {
-  const file = useRef<HTMLInputElement>(null);
-  const [note, setNote] = useState<string | null>(null);
   const collectedIds = new Set(artists.map((a) => a.id));
   const empty = artists.length === 0 && totalRecords === 0;
-
-  const exportCollection = () => {
-    const blob = new Blob([collection.exportJson()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `sleeve-collection-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
-  const importCollection = async (f: File) => {
-    try {
-      const added = collection.importJson(await f.text());
-      setNote(added ? `Added ${added} item${added === 1 ? '' : 's'}.` : 'Nothing new in that file.');
-    } catch (e) {
-      setNote((e as Error).message);
-    }
-  };
 
   return (
     <>
@@ -90,37 +76,17 @@ export function CollectionView({
           Your collection
           <span className="count">
             {totalRecords} record{totalRecords === 1 ? '' : 's'} · {artists.length} artist{artists.length === 1 ? '' : 's'}
+            {shelf === 'records' && recordsView === 'order' && !query && totalRecords > 1 && ' · drag to arrange'}
           </span>
         </motion.h1>
         <div className="collection-tools">
           {!empty && (
-            <Segmented
-              small
-              groupId="collectionSort"
-              value={shelf === 'artists' ? (sort === 'recent' ? 'recent' : 'artist') : sort === 'year' ? 'recent' : sort}
-              options={shelf === 'artists' ? ARTIST_SORTS : RECORD_SORTS}
-              onChange={onSort}
-            />
+            shelf === 'artists' ? (
+              <Segmented small groupId="artistsSort" value={artistsSort} options={ARTIST_SORTS} onChange={onArtistsSort} />
+            ) : (
+              <Segmented small groupId="recordsView" value={recordsView} options={RECORD_VIEWS} onChange={onRecordsView} />
+            )
           )}
-          {!empty && (
-            <button className="text-btn" onClick={exportCollection} title="Download a backup of your collection">
-              Export
-            </button>
-          )}
-          <button className="text-btn" onClick={() => file.current?.click()} title="Load a collection backup">
-            Import
-          </button>
-          <input
-            ref={file}
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importCollection(f);
-              e.target.value = '';
-            }}
-          />
         </div>
       </div>
 
@@ -147,8 +113,6 @@ export function CollectionView({
           </label>
         )}
       </div>
-
-      {note && <p className="search-hint">{note}</p>}
 
       {empty ? (
         <motion.div className="empty-collection" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -192,7 +156,7 @@ export function CollectionView({
           animate={{ opacity: 1, y: 0 }}
         >
           {records.length ? (
-            <motion.div key={sort} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div key={recordsView} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <ArtGrid
                 items={records}
                 loading={false}
@@ -200,6 +164,12 @@ export function CollectionView({
                 onSelect={onSelect}
                 collectedArtistIds={collectedIds}
                 onCollectArtist={onCollectArtist}
+                groupLabel={recordsView === 'artist' ? (item) => item.subtitle : undefined}
+                onReorder={
+                  recordsView === 'order' && !query
+                    ? (ordered) => onArrange(ordered.map((r) => r.albumId!).filter(Boolean))
+                    : undefined
+                }
               />
             </motion.div>
           ) : (
