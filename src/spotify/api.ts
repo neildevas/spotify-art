@@ -301,16 +301,16 @@ export function albumToItem({ album, added_at }: SavedAlbum): ArtItem {
 }
 
 /**
- * A record from your liked songs: the album, with every song you've liked on it marked and the
- * most recently liked one highlighted when it opens.
+ * A liked song's record, opened from Liked songs: the album, with that song highlighted and every
+ * song you've liked on it marked.
  */
-export function likedRecordToItem(album: Album, likedOnAlbum: string[]): ArtItem {
+export function likedSongToItem(album: Album, trackId: string, likedOnAlbum: string[]): ArtItem {
   const base = artistAlbumToItem(album);
   const n = likedOnAlbum.length;
   return {
     ...base,
-    key: `liked-${album.id}`,
-    highlightTrackId: likedOnAlbum[0],
+    key: `liked-${trackId}`,
+    highlightTrackId: trackId,
     likedTrackIds: likedOnAlbum,
     details: [...base.details, `♥ ${n} liked song${n === 1 ? '' : 's'}`],
   };

@@ -9,7 +9,7 @@ import { NowPlayingBar } from './player/NowPlayingBar';
 import { PlayerProvider } from './player/PlayerContext';
 import { Login } from './components/Login';
 import { SearchView } from './components/SearchView';
-import { LikesView } from './components/LikesView';
+import { type LikeRow, LikesView } from './components/LikesView';
 import { clearLikes, useLikes } from './hooks/useLikes';
 import {
   type SearchFilter,
@@ -26,7 +26,7 @@ import {
   getArtist,
   isPlayable,
   artistRecordItems,
-  likedRecordToItem,
+  likedSongToItem,
   getMe,
   groupTracksByAlbum,
   recordToItem,
@@ -125,7 +125,6 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   const [artistGroup, setArtistGroup] = usePersisted<AlbumGroup>('sleeve.artistGroup', 'album');
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = usePersisted<SearchFilter>('sleeve.searchFilter', 'all');
-  const [hideOwned, setHideOwned] = usePersisted('sleeve.likesHideOwned', false);
   const [artist, setArtist] = useState<Artist | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [selected, setSelected] = useState<ArtItem | null>(null);
@@ -144,31 +143,23 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
   // Your records by the open artist come first on their page (and in the overlay's ← → order).
   const artistRecords = useMemo(() => (artist ? artistRecordItems(records, artist.id) : []), [records, artist]);
 
-  // Records from your Spotify liked songs (Collection → From your likes).
+  // Liked songs: a Spotify extra behind the profile menu. Back returns to whichever tab you came from.
+  const [likesBackTo, setLikesBackTo] = useState<View>('collection');
   const showLikes = view === 'likes' && !artist;
   const likes = useLikes(showLikes, onSignOut);
-  const ownedIds = useMemo(() => new Set(records.map((r) => r.id)), [records]);
-  // One tile per record, in the order of its most recent liked song. Likes arrive newest first, so a
-  // record's place is fixed the first time it shows up: later pages only add records at the end.
-  const likedRecords = useMemo(() => {
-    const byAlbum = new Map<string, string[]>();
+  const likeRows = useMemo<LikeRow[]>(() => {
+    const likedOnAlbum = new Map<string, string[]>();
     for (const l of likes.likes) {
-      const ids = byAlbum.get(l.albumId);
+      const ids = likedOnAlbum.get(l.albumId);
       if (ids) ids.push(l.trackId);
-      else byAlbum.set(l.albumId, [l.trackId]);
+      else likedOnAlbum.set(l.albumId, [l.trackId]);
     }
-    return [...byAlbum].filter(([id]) => likes.albums[id]).map(([id, ids]) => likedRecordToItem(likes.albums[id], ids));
+    return likes.likes
+      .filter((l) => likes.albums[l.albumId])
+      .map((like) => ({ like, item: likedSongToItem(likes.albums[like.albumId], like.trackId, likedOnAlbum.get(like.albumId)!) }));
   }, [likes.likes, likes.albums]);
-  const likedItems = useMemo(
-    () => (hideOwned ? likedRecords.filter((r) => !ownedIds.has(r.albumId!)) : likedRecords),
-    [likedRecords, ownedIds, hideOwned],
-  );
-  const likesStats = {
-    songs: likes.likes.length,
-    records: likedRecords.length,
-    missing: likedRecords.filter((r) => !ownedIds.has(r.albumId!)).length,
-    total: likes.total,
-  };
+  const likedItems = useMemo(() => likeRows.map((r) => r.item), [likeRows]);
+
 
 
 
@@ -295,14 +286,20 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
           onView={(v) => {
             setSelected(null);
             // An artist page opened from the Collection belongs to that visit; leaving the tab closes it.
-            // Likes never shows an artist page, so going there closes one too.
-            if (artistOrigin === 'collection' || v === 'likes') setArtist(null);
+            if (artistOrigin === 'collection') setArtist(null);
             setView(v);
           }}
           tileSize={tileSize}
           onTileSize={setTileSize}
           user={user}
           onLogout={onSignOut}
+          onLikedSongs={() => {
+            setSelected(null);
+            setArtist(null);
+            if (view !== 'likes') setLikesBackTo(view);
+            setView('likes');
+            window.scrollTo({ top: 0 });
+          }}
         />
 
         <main className="main" style={{ '--tile': `${tileSize}px` } as React.CSSProperties}>
@@ -344,15 +341,14 @@ function Wall({ onSignOut }: { onSignOut: () => void }) {
             />
           ) : showLikes ? (
             <LikesView
-              items={likedItems}
-              stats={likesStats}
-              tileSize={tileSize}
+              rows={likeRows}
+              total={likes.total}
               loading={likes.loading}
               refreshing={likes.refreshing}
               error={likes.error}
-              hideOwned={hideOwned}
-              onHideOwned={setHideOwned}
-              onSelect={setSelected}
+              backLabel={likesBackTo === 'search' ? 'Search' : 'Collection'}
+              onBack={() => setView(likesBackTo === 'search' ? 'search' : 'collection')}
+              onOpenRecord={setSelected}
               onRefresh={likes.refresh}
             />
           ) : view === 'search' || view === 'likes' ? (
